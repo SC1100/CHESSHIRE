@@ -1,0 +1,5 @@
+[gd_scene format=3 uid="uid://c03yu5pqa32yo"]
+
+[ext_resource type="PackedScene" uid="uid://by3sk7x5nh0wf" path="res://chess_board.glb" id="1_h2val"]
+
+[node name="Sketchfab_Scene" unique_id=530045322 instance=ExtResource("1_h2val")]
