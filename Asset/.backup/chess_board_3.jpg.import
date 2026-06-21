@@ -2,20 +2,20 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://fmqn04tkl4t4"
-path.s3tc="res://.godot/imported/chess_board_0.jpg-485aeb255f8034695df547f40e1f9cce.s3tc.ctex"
+uid="uid://bnax5miwdevx1"
+path.s3tc="res://.godot/imported/chess_board_3.jpg-c7aec386abb544155bac531d01ee4c4b.s3tc.ctex"
 metadata={
 "imported_formats": ["s3tc_bptc"],
 "vram_texture": true
 }
 generator_parameters={
-"md5": "2d9e548bb4bd3afdda8c65d1c5bf4423"
+"md5": "4207f8d2be4585fa794cb77d0f919465"
 }
 
 [deps]
 
-source_file="res://chess_board_0.jpg"
-dest_files=["res://.godot/imported/chess_board_0.jpg-485aeb255f8034695df547f40e1f9cce.s3tc.ctex"]
+source_file="res://Asset/chess_board_3.jpg"
+dest_files=["res://.godot/imported/chess_board_3.jpg-c7aec386abb544155bac531d01ee4c4b.s3tc.ctex"]
 
 [params]
 
