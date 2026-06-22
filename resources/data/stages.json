@@ -1,0 +1,44 @@
+{
+  "test_stage": {
+    "grid_info": {
+      "max_col": "h",
+      "max_row": 8,
+      "blocked_tiles": [],
+      "special_tiles": {}
+    },
+    "layout": {
+      "a8": "B_Rook",
+      "b8": "B_Knight",
+      "c8": "B_Bishop",
+      "d8": "B_Queen",
+      "e8": "B_King",
+      "f8": "B_Bishop",
+      "g8": "B_Knight",
+      "h8": "B_Rook",
+      "a7": "B_Pawn",
+      "b7": "B_Pawn",
+      "c7": "B_Pawn",
+      "d7": "B_Pawn",
+      "e7": "B_Pawn",
+      "f7": "B_Pawn",
+      "g7": "B_Pawn",
+      "h7": "B_Pawn",
+      "a2": "W_Pawn",
+      "b2": "W_Pawn",
+      "c2": "W_Pawn",
+      "d2": "W_Pawn",
+      "e2": "W_Pawn",
+      "f2": "W_Pawn",
+      "g2": "W_Pawn",
+      "h2": "W_Pawn",
+      "a1": "W_Rook",
+      "b1": "W_Knight",
+      "c1": "W_Bishop",
+      "d1": "W_Queen",
+      "e1": "W_King",
+      "f1": "W_Bishop",
+      "g1": "W_Knight",
+      "h1": "W_Rook"
+    }
+  }
+}

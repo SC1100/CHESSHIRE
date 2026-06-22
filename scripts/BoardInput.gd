@@ -26,6 +26,32 @@ func _physics_process(_delta: float) -> void:
 	
 	# 4. 결과 처리하여 Label 업데이트
 	if result and result.collider is Area3D:
-		info_label.text = "현재 위치: " + result.collider.name
+		var collider = result.collider
+		var board_manager = get_node_or_null("../BoardManager")
+		
+		# 1) 부딪힌 객체가 기물인지 확인 (기물은 BoardManager의 자식 노드임)
+		var hovered_piece = null
+		if board_manager:
+			var current = collider
+			while current and current != get_tree().root:
+				if current.get_parent() == board_manager:
+					hovered_piece = current
+					break
+				current = current.get_parent()
+				
+		if hovered_piece:
+			# 기물 위에 마우스를 올린 경우
+			info_label.text = "현재 위치 : " + hovered_piece.name
+		else:
+			# 2) 보드판 타일 위에 마우스를 올린 경우
+			var tile_name = collider.name
+			var text = "현재 위치 : " + tile_name
+			
+			if board_manager:
+				var piece_name = board_manager.get_piece_name_on_tile(tile_name)
+				if piece_name != "":
+					text += " (" + piece_name + ")"
+					
+			info_label.text = text
 	else:
-		info_label.text = "현재 위치: None"
+		info_label.text = "현재 위치 : None"
