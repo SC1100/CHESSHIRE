@@ -82,6 +82,9 @@ _surfaces = [{
 blend_shape_mode = 0
 shadow_mesh = SubResource("ArrayMesh_hbb71")
 
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_q8qu5"]
+albedo_color = Color(0.65834004, 0.6583399, 0.6583399, 1)
+
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_kgcvr"]
 resource_name = "03_-_Default"
 cull_mode = 2
@@ -368,6 +371,7 @@ mesh = SubResource("ArrayMesh_oxl8g")
 
 [node name="Chess Board_07 - Default_0" type="MeshInstance3D" parent="Sketchfab_model/Chess Board_FBX/Chess Board" unique_id=1036407657]
 mesh = SubResource("ArrayMesh_xkol5")
+surface_material_override/0 = SubResource("StandardMaterial3D_q8qu5")
 
 [node name="Chess Board_03 - Default_0" type="MeshInstance3D" parent="Sketchfab_model/Chess Board_FBX/Chess Board" unique_id=876190822]
 mesh = SubResource("ArrayMesh_r4bw0")

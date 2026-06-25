@@ -24,10 +24,11 @@ camera_attributes = SubResource("CameraAttributesPractical_uette")
 compositor = SubResource("Compositor_3ptm4")
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=1520065918]
-transform = Transform3D(1, 0, 0, 0, -0.0011693673, 0.99999934, 0, -0.99999934, -0.0011693673, 0, 4.1611443, 0)
+transform = Transform3D(1, 0, 0, 0, -0.0011693673, 0.99999934, 0, -0.99999934, -0.0011693673, 35.160416, 53.28016, -0.6977844)
+shadow_enabled = true
 
 [node name="Camera3D" type="Camera3D" parent="." unique_id=1925017109]
-transform = Transform3D(1, 0, 0, 0, 0.2721123, 0.96226555, 0, -0.96226555, 0.2721123, 0, 28.951733, 11.069076)
+transform = Transform3D(1, 0, 0, 0, 0.3204146, 0.9472775, 0, -0.9472775, 0.3204146, 0, 33.14577, 11.069076)
 
 [node name="CanvasLayer" type="CanvasLayer" parent="." unique_id=1342981493]
 
