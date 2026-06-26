@@ -1,6 +1,8 @@
 extends Node
 class_name BoardManager
 
+const Grid = preload("res://scripts/rules/Grid.gd")
+
 @export var board_grid_path: NodePath = ^"../ChessBoard/Grid"
 
 # 1. 흑/백 기물 씬 미리 로드
@@ -78,8 +80,10 @@ func load_stage(stage_id: String):
 		
 	var stage_data = stages[stage_id]
 	
-	# 향후 스테이지 메타데이터(grid_info)를 사용할 수 있도록 확보해둡니다.
+	# 스테이지 메타데이터(grid_info)는 Grid 스크립트(rules/Grid.gd)로 넘겨서 관리합니다.
 	var grid_info = stage_data.get("grid_info", {})
+	Grid.setup(grid_info)
+	
 	var layout = stage_data.get("layout", {})
 	
 	var piece_counts = {} # 종류별 소환 횟수를 추적하는 딕셔너리
