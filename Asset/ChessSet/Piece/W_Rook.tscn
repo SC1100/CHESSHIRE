@@ -1,7 +1,8 @@
 [gd_scene format=4 uid="uid://djgbxwfuyrdeo"]
 
 [ext_resource type="Texture2D" uid="uid://hespvdugicuj" path="res://Asset/ChessSet/Piece/piece_Image_1.jpg" id="1_o53w1"]
-[ext_resource type="Script" path="res://scenes/components/GridDetectorComponent.gd" id="grid_detector_script"]
+[ext_resource type="Script" uid="uid://d25u2lwd2pld7" path="res://components/GridDetectorComponent.gd" id="grid_detector_script"]
+
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_kj0nw"]
 resource_name = "02_-_Default"
