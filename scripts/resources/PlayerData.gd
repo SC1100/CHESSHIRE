@@ -37,7 +37,8 @@ static func load_data() -> PlayerData:
 	var new_data = PlayerData.new()
 	
 	# 테스트용 초기 덱 지급 (10종의 카드 모두 1장씩 보유)
-	new_data.deck_card_ids = [
+	# Godot 4의 엄격한 타입 검사(Array[String])를 통과하기 위해 assign()을 사용합니다.
+	new_data.deck_card_ids.assign([
 		"searing_blade",
 		"silent_dagger",
 		"arcane_bolt",
@@ -48,5 +49,5 @@ static func load_data() -> PlayerData:
 		"ironclad_will",
 		"noxious_fumes",
 		"storm_of_steel"
-	]
+	])
 	return new_data

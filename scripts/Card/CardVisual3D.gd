@@ -9,11 +9,12 @@ var collision_shape: CollisionShape3D
 var target_position: Vector3 = Vector3.ZERO
 var target_rotation: Vector3 = Vector3.ZERO
 var is_dragging: bool = false
+var is_drawing: bool = false # 드로우 애니메이션 진행 여부
 
 func _init(_data: CardData):
 	data = _data
 	
-	# 1. 3D 메쉬(외형) 생성
+	# 1. 3D 메쉬(외형) 생성 - 앞면
 	mesh_instance = MeshInstance3D.new()
 	var quad = QuadMesh.new()
 	quad.size = Vector2(1.0, 1.36) # 카드의 3D 비율 (약 1:1.36)
@@ -29,12 +30,26 @@ func _init(_data: CardData):
 	mat.uv1_scale = Vector3(tex.region.size.x / atlas_size.x, tex.region.size.y / atlas_size.y, 1.0)
 	mat.uv1_offset = Vector3(tex.region.position.x / atlas_size.x, tex.region.position.y / atlas_size.y, 0.0)
 	
-	mat.cull_mode = BaseMaterial3D.CULL_DISABLED # 뒷면도 보이도록
+	mat.cull_mode = BaseMaterial3D.CULL_BACK # 뒷면은 안 보이도록(뒷면용 메쉬 따로 생성)
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED # 빛 영향 없이 선명하게 보이도록 설정
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	mesh_instance.material_override = mat
-	
 	add_child(mesh_instance)
+	
+	# 1-2. 3D 메쉬 생성 - 뒷면
+	var back_mesh_instance = MeshInstance3D.new()
+	back_mesh_instance.mesh = quad # 같은 크기의 판(Quad) 재사용
+	
+	var back_mat = StandardMaterial3D.new()
+	back_mat.albedo_texture = load("res://Asset/test/card_back_test.png")
+	back_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	back_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	back_mat.cull_mode = BaseMaterial3D.CULL_BACK
+	
+	back_mesh_instance.material_override = back_mat
+	back_mesh_instance.rotation_degrees = Vector3(0, 180, 0) # 뒤집어지게 설정
+	back_mesh_instance.position = Vector3(0, 0, -0.001) # 앞면과 겹쳐서 깨지지(Z-fighting) 않도록 살짝 뒤로 뺌
+	add_child(back_mesh_instance)
 	
 	# 2. 충돌체(Raycast 감지용) 생성
 	collision_shape = CollisionShape3D.new()
@@ -49,8 +64,8 @@ func _init(_data: CardData):
 	collision_mask = 0
 
 func _process(delta: float):
-	if is_dragging:
-		return # 드래그 중에는 외부(매니저)에서 위치를 강제 조작합니다.
+	if is_dragging or is_drawing:
+		return # 드래그 중이거나 드로우 애니메이션 중에는 외부(매니저/트윈)에서 위치를 제어합니다.
 		
 	# 드래그 중이 아닐 때는 목표 위치(부채꼴 대형)로 부드럽게 날아갑니다.
 	global_position = global_position.lerp(target_position, 10.0 * delta)
