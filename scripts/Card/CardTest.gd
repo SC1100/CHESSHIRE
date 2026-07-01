@@ -25,10 +25,11 @@ func _ready() -> void:
 	# 4. 가짜(더미) 덱 10장 만들기
 	var dummy_deck: Array[CardData] = []
 	for i in range(10):
-		var card = CardData.new()
-		card.id = "c_" + str(i)
-		card.card_name = "카드 " + str(i + 1)
-		card.cost = (i % 3) + 1 # 코스트 1~3 반복
+		var c_id = "c_" + str(i)
+		var c_name = "카드 " + str(i + 1)
+		var c_cost = (i % 3) + 1
+		# CardData의 _init()은 최소 6개의 인자를 요구합니다.
+		var card = CardData.new(c_id, c_name, c_cost, CardData.CardType.SKILL, Rect2(), "테스트 카드입니다.")
 		dummy_deck.append(card)
 		
 	# 5. 전투 시작! (초기 손패 3장 드로우 및 멀리건)
