@@ -1,7 +1,6 @@
 extends Node
 class_name BoardManager
 
-const Grid = preload("res://scripts/rules/Grid.gd")
 
 @export var board_grid_path: NodePath = ^"../ChessBoard/Grid"
 

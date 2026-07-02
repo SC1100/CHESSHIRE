@@ -1,0 +1,56 @@
+[gd_scene format=3 uid="uid://mm5n3x1wr7sv"]
+
+[ext_resource type="Script" uid="uid://b036joe7135eq" path="res://scripts/BoardInput.gd" id="2_input"]
+[ext_resource type="PackedScene" uid="uid://c5div4qwskgw1" path="res://Asset/ChessSet/ChessBoard.tscn" id="2_iq7mn"]
+[ext_resource type="Script" uid="uid://c1645qw0etx00" path="res://scripts/managers/BoardManager.gd" id="3_manager"]
+[ext_resource type="Script" path="res://scripts/ai/AITestRunner.gd" id="4_airunner"]
+
+[sub_resource type="Sky" id="Sky_o4yrx"]
+
+[sub_resource type="Environment" id="Environment_iq7mn"]
+background_energy_multiplier = 2.0
+sky = SubResource("Sky_o4yrx")
+ambient_light_source = 2
+ambient_light_color = Color(0.8560673, 0.8560673, 0.85606724, 1)
+
+[sub_resource type="CameraAttributesPractical" id="CameraAttributesPractical_uette"]
+
+[sub_resource type="Compositor" id="Compositor_3ptm4"]
+
+[node name="BattleScene" type="Node3D" unique_id=2103229188]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=318057108]
+environment = SubResource("Environment_iq7mn")
+camera_attributes = SubResource("CameraAttributesPractical_uette")
+compositor = SubResource("Compositor_3ptm4")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=1520065918]
+transform = Transform3D(1, 0, 0, 0, -0.0011693673, 0.99999934, 0, -0.99999934, -0.0011693673, -0.010250092, 53.28016, -0.6977844)
+shadow_enabled = true
+
+[node name="Camera3D" type="Camera3D" parent="." unique_id=1925017109]
+transform = Transform3D(1, 0, 0, 0, 0.3204146, 0.9472775, 0, -0.9472775, 0.3204146, 0, 33.14577, 11.069076)
+
+[node name="CanvasLayer" type="CanvasLayer" parent="." unique_id=1342981493]
+
+[node name="InfoLabel" type="Label" parent="CanvasLayer" unique_id=892122189]
+offset_left = 32.0
+offset_top = 32.0
+offset_right = 232.0
+offset_bottom = 82.0
+theme_override_font_sizes/font_size = 32
+text = "현재 위치: None"
+
+[node name="BoardInput" type="Node" parent="." unique_id=826183973 node_paths=PackedStringArray("camera", "info_label")]
+script = ExtResource("2_input")
+camera = NodePath("../Camera3D")
+info_label = NodePath("../CanvasLayer/InfoLabel")
+
+[node name="ChessBoard" parent="." unique_id=1128509656 instance=ExtResource("2_iq7mn")]
+transform = Transform3D(-8.742278e-07, 0, 20, 0, 20, 0, -20, 0, -8.742278e-07, 0, 0, 0)
+
+[node name="BoardManager" type="Node" parent="." unique_id=1393320730]
+script = ExtResource("3_manager")
+
+[node name="AITestRunner" type="Node" parent="."]
+script = ExtResource("4_airunner")
