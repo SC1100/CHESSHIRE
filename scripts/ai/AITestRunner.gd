@@ -3,6 +3,24 @@ extends Node
 @onready var board_manager = $"../BoardManager"
 var is_player_turn = true
 
+# ==========================================
+# [AI 가중치 조절 패널]
+# 에디터 우측 인스펙터나 여기서 직접 수치를 변경하며 테스트하세요.
+# ==========================================
+@export var WEIGHT_PROXIMITY_BONUS: float = 1.5 # VIP에게 1칸 다가갈 때마다 얻는 보너스 점수 (좀비 호드 튜닝용)
+@export var WEIGHT_THREAT_RATIO: float = 0.3 # 적군을 위협할 때 얻는 점수 비율 (0.3 = 적 가치의 20%)
+@export var WEIGHT_DANGER_RATIO: float = 1.0 # 자신이 위험에 처했을 때 깎이는 점수 비율 (1.0 = 내 가치의 100%)
+@export var WEIGHT_DEFENSE_RATIO: float = 0.05 # 아군을 수비할 때 얻는 점수 비율 (평시 5%)
+@export var WEIGHT_ACTIVE_DEFENSE_RATIO: float = 0.2 # 적에게 공격받는 아군을 방어할 때의 점수 비율 (20%)
+# ==========================================
+
+# --- 캐싱(Incremental Evaluation) 전용 상태 ---
+var cache_base_score: float = 0.0
+var cache_white_vips: Array[String] = []
+var cache_piece_controls: Dictionary = {}
+var cache_piece_control_pts: Dictionary = {}
+var cache_tile_threats: Dictionary = {}
+
 func _ready():
 	# 턴 넘기기 버튼 UI 생성
 	var canvas = CanvasLayer.new()
@@ -47,6 +65,9 @@ func _on_enemy_turn():
 		is_player_turn = true
 		return
 		
+	# 시뮬레이션 전, 전체 보드를 1회만 순회하여 캐시를 생성합니다.
+	_build_cache(board_manager.current_board_state)
+		
 	var best_piece = null
 	var best_tile = ""
 	var highest_score = -9999.0
@@ -90,75 +111,142 @@ func _on_enemy_turn():
 	is_player_turn = true
 
 func _simulate_and_evaluate(piece: Node, start_tile: String, target_tile: String) -> float:
-	# 1. 시뮬레이션용 가상 보드 복사
 	var sim_board = board_manager.current_board_state.duplicate()
-	
-	# 이동 실행 (기존 자리 비우기 -> 적 있으면 삭제 -> 새 자리 차지)
-	sim_board.erase(start_tile)
+	var cap_p = null
 	if sim_board.has(target_tile):
+		cap_p = sim_board[target_tile]
+		if cap_p.is_in_group("VIP_Target"): return 9999999.0
 		sim_board.erase(target_tile)
+	
+	sim_board.erase(start_tile)
 	sim_board[target_tile] = piece
 	
-	# 2. 글로벌 보드 가치 평가 (나의 총합 - 적의 총합)
-	return _evaluate_board_state(sim_board)
-
-# 보드 전체의 기물 가치와 "통제력(Grid Control)"을 종합 산출
-func _evaluate_board_state(board: Dictionary) -> float:
-	var black_score = 0.0
-	var white_score = 0.0
+	var delta_black = 0.0
+	var delta_white = 0.0
 	
-	# 목표물 추적을 위한 백색 진영 VIP 타일 위치 수집
-	var white_vip_tiles = []
-	for tile in board.keys():
+	# 1. 이동에 따른 기물 기본 가치 및 프록시미티 델타
+	delta_black -= _get_base_score(piece, start_tile)
+	delta_black += _get_base_score(piece, target_tile)
+	
+	if cap_p != null:
+		var cap_val = _get_base_score(cap_p, target_tile)
+		if cap_p.name.begins_with("B_"): delta_black -= cap_val
+		else: delta_white -= cap_val
+		
+	# 2. 선 관통(Ray) 변화 및 타겟 변경에 의한 통제력 재계산 대상 식별
+	var recalc_set = {}
+	recalc_set[piece.name] = true
+	if cap_p != null: recalc_set[cap_p.name] = false
+	
+	if cache_tile_threats.has(start_tile):
+		for pn in cache_tile_threats[start_tile]: recalc_set[pn] = true
+	if cache_tile_threats.has(target_tile):
+		for pn in cache_tile_threats[target_tile]: recalc_set[pn] = true
+		
+	# 3. 통제력 델타 연산
+	for pn in recalc_set.keys():
+		var p_is_black = pn.begins_with("B_")
+		
+		# 기존 캐시된 점수 삭감
+		if cache_piece_control_pts.has(pn):
+			var old_pts = cache_piece_control_pts[pn]
+			if p_is_black: delta_black -= old_pts
+			else: delta_white -= old_pts
+			
+		# 새 상태에서 재계산 (생존한 기물만)
+		if recalc_set[pn]:
+			var cur_tile = ""
+			var t_node = null
+			for t in sim_board:
+				if is_instance_valid(sim_board[t]) and sim_board[t].name == pn:
+					cur_tile = t
+					t_node = sim_board[t]
+					break
+					
+			if cur_tile != "":
+				var ctrls = _get_controlled_tiles(pn, cur_tile, sim_board)
+				var new_pts = _calc_piece_ctrl_pts(t_node, p_is_black, ctrls, sim_board)
+				if p_is_black: delta_black += new_pts
+				else: delta_white += new_pts
+				
+	# 4. 캐시된 초기 점수에 델타를 합산
+	var base_score = cache_base_score + delta_black - delta_white
+	
+	# 5. 위험 점수 (Danger Score)
+	var is_in_danger = _is_tile_attacked_by_enemy(target_tile, piece.name.begins_with("B_"), sim_board)
+	if is_in_danger:
+		base_score -= _get_piece_value(piece) * 10.0 * WEIGHT_DANGER_RATIO
+		
+	return base_score
+
+# 매 턴 1회 실행되어 전체 보드를 스캔하고 캐시를 빌드
+func _build_cache(board: Dictionary):
+	cache_white_vips.clear()
+	cache_piece_controls.clear()
+	cache_piece_control_pts.clear()
+	cache_tile_threats.clear()
+	
+	var b_score = 0.0
+	var w_score = 0.0
+	
+	# VIP 위치 식별
+	for tile in board:
 		var p = board[tile]
 		if is_instance_valid(p) and p.is_in_group("VIP_Target") and p.name.begins_with("W_"):
-			white_vip_tiles.append(tile)
-	
-	for tile in board.keys():
+			cache_white_vips.append(tile)
+			
+	for tile in board:
 		var p = board[tile]
 		if not is_instance_valid(p): continue
+		var p_black = p.name.begins_with("B_")
 		
-		var is_black = p.name.begins_with("B_")
-		var piece_val = _get_piece_value(p) * 10.0 # 폰 50, 타겟 100000
+		var val = _get_base_score(p, tile)
+		if p_black: b_score += val
+		else: w_score += val
 		
-		if is_black: 
-			black_score += piece_val
-			# 흑색 기물일 경우, 백색 VIP와의 거리를 계산해 은은한 '사냥개' 보너스를 부여
-			for vip_tile in white_vip_tiles:
-				var dist = _get_manhattan_distance(tile, vip_tile)
-				# 맵의 최대 거리(약 14)에서 가까워질수록 보너스. (거리가 1 줄어들 때마다 +1.5점)
-				# 이 점수는 포획/통제 점수(수십~수백점)보다 훨씬 낮아, 무의미한 자살 돌격을 방지합니다.
-				black_score += (14.0 - dist) * 1.5
-		else: 
-			white_score += piece_val
+		var ctrls = _get_controlled_tiles(p.name, tile, board)
+		cache_piece_controls[p.name] = ctrls
+		
+		var pts = _calc_piece_ctrl_pts(p, p_black, ctrls, board)
+		cache_piece_control_pts[p.name] = pts
+		if p_black: b_score += pts
+		else: w_score += pts
+		
+		for c_tile in ctrls:
+			if not cache_tile_threats.has(c_tile):
+				cache_tile_threats[c_tile] = []
+			cache_tile_threats[c_tile].append(p.name)
 			
-		# 통제하고 있는 그리드(이동/공격 가능 칸) 수집
-		var controlled_tiles = _get_controlled_tiles(p.name, tile, board)
-		for c_tile in controlled_tiles:
-			var ctrl_pts = _get_static_tile_value(c_tile)
-			
-			# [동적 통제력] 사냥감(적) 주변을 통제하면 가산점
-			if _is_near_enemy(c_tile, is_black, board):
-				ctrl_pts += 20.0
-				
-			# [상호 방어 통제력] 내가 통제하는 칸에 기물이 있다면
-			if board.has(c_tile):
-				var target_p = board[c_tile]
-				if is_instance_valid(target_p):
-					var target_is_black = target_p.name.begins_with("B_")
-					if is_black == target_is_black:
-						# 아군을 지켜주고 있다면 그 아군 가치의 10% 획득 (수비 진형)
-						ctrl_pts += _get_piece_value(target_p) * 1.0
+	cache_base_score = b_score - w_score
+
+# 기물의 기본 가치 + VIP 근접 가중치 계산
+func _get_base_score(piece: Node, tile: String) -> float:
+	var val = _get_piece_value(piece) * 10.0
+	# 자신이 킹(VIP)인 경우 사냥개가 아니므로 거리 보너스를 받지 않음
+	if piece.name.begins_with("B_") and not piece.is_in_group("VIP_Target"):
+		for vip in cache_white_vips:
+			val += (14.0 - _get_manhattan_distance(tile, vip)) * WEIGHT_PROXIMITY_BONUS
+	return val
+
+# 기물의 통제력(Grid Control) 점수 산출
+func _calc_piece_ctrl_pts(piece: Node, is_black: bool, controls: Array[String], board: Dictionary) -> float:
+	var pts = 0.0
+	for c_tile in controls:
+		pts += _get_static_tile_value(c_tile)
+		if _is_near_enemy(c_tile, is_black, board):
+			pts += 20.0
+		if board.has(c_tile):
+			var tp = board[c_tile]
+			if is_instance_valid(tp):
+				if is_black == tp.name.begins_with("B_"):
+					if _is_tile_attacked_by_enemy(c_tile, is_black, board):
+						pts += _get_piece_value(tp) * WEIGHT_ACTIVE_DEFENSE_RATIO
 					else:
-						# 적군을 위협하고 있다면 그 적 가치의 50% 획득 (위협 점수)
-						# 적 VIP를 노리면 여기서 10000 * 5.0 = +50000점이 터짐!
-						ctrl_pts += _get_piece_value(target_p) * 5.0
-						
-			if is_black: black_score += ctrl_pts
-			else: white_score += ctrl_pts
-			
-	# 나의 점수(Black) - 적의 점수(White)의 격차(Zero-Sum) 반환
-	return black_score - white_score
+						pts += _get_piece_value(tp) * WEIGHT_DEFENSE_RATIO
+				else:
+					pts += _get_piece_value(tp) * WEIGHT_THREAT_RATIO
+	return pts
+
 
 # 특정 기물이 통제(이동/공격)할 수 있는 모든 칸 반환
 func _get_controlled_tiles(piece_name: String, start_tile: String, board: Dictionary) -> Array[String]:
@@ -190,6 +278,16 @@ func _get_static_tile_value(tile: String) -> float:
 	if col in ["a", "h"] or row in [1, 8]: return 0.0 # 구석/벽면
 	return 2.0 # 일반 필드
 
+# 특정 타일이 적군에게 현재 공격(위협)받고 있는지 판별
+func _is_tile_attacked_by_enemy(target_tile: String, is_black: bool, board: Dictionary) -> bool:
+	for tile in board:
+		var p = board[tile]
+		if is_instance_valid(p):
+			if p.name.begins_with("B_") != is_black:
+				if ChessRules.is_move_valid(p.name, tile, target_tile, board):
+					return true
+	return false
+
 # 특정 타일 주변 반경 1칸 이내에 적 기물이 있는지 판별
 func _is_near_enemy(tile: String, is_black: bool, board: Dictionary) -> bool:
 	var col_idx = tile[0].unicode_at(0)
@@ -207,15 +305,16 @@ func _is_near_enemy(tile: String, is_black: bool, board: Dictionary) -> bool:
 
 # 기물별 가중치 반환 함수 (Node를 인자로 받아 그룹 검사)
 func _get_piece_value(piece: Node) -> float:
-	# 하드코딩 배제: 이름에 상관없이 "VIP_Target" 그룹(태그)이 있으면 무조건 게임 오버급 가치 부여
-	if piece.is_in_group("VIP_Target"): 
-		return 10000.0
+	# 그룹 부여가 누락되는 초기화 시점 버그를 대비한 안전장치(Fallback)
+	if piece.is_in_group("VIP_Target") or "King" in piece.name:
+		return 99999.0
 		
+	# 정체 현상(오실레이션) 해결을 위해 통제력 대비 기물 가치를 5배 상향 조정
 	var piece_name = piece.name
-	if "Pawn" in piece_name: return 5.0
-	if "Knight" in piece_name or "Bishop" in piece_name: return 15.0
-	if "Rook" in piece_name: return 25.0
-	if "Queen" in piece_name: return 45.0
+	if "Pawn" in piece_name: return 25.0
+	if "Knight" in piece_name or "Bishop" in piece_name: return 75.0
+	if "Rook" in piece_name: return 125.0
+	if "Queen" in piece_name: return 225.0
 	return 0.0
 
 # 두 타일 사이의 맨해튼 거리(격자 이동 거리) 계산
