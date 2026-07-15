@@ -12,6 +12,8 @@ var is_player_turn = true
 @export var WEIGHT_DANGER_RATIO: float = 1.0 # 자신이 위험에 처했을 때 깎이는 점수 비율 (1.0 = 내 가치의 100%)
 @export var WEIGHT_DEFENSE_RATIO: float = 0.05 # 아군을 수비할 때 얻는 점수 비율 (평시 5%)
 @export var WEIGHT_ACTIVE_DEFENSE_RATIO: float = 0.2 # 적에게 공격받는 아군을 방어할 때의 점수 비율 (20%)
+@export var WEIGHT_THREAT_REMOVAL_BONUS: float = 0.3 # 하위 기물로 상위 기물의 위협을 제거할 때 얻는 보너스 비율 (30%)
+@export var WEIGHT_UNPROTECTED_CAPTURE_BONUS: float = 0.3 # 보호받지 않는 적 기물을 포획할 때 얻는 추가 보너스 비율 (30%)
 # ==========================================
 
 # --- 캐싱(Incremental Evaluation) 전용 상태 ---
@@ -131,7 +133,27 @@ func _simulate_and_evaluate(piece: Node, start_tile: String, target_tile: String
 	if cap_p != null:
 		var cap_val = _get_base_score(cap_p, target_tile)
 		if cap_p.name.begins_with("B_"): delta_black -= cap_val
-		else: delta_white -= cap_val
+		else:
+			delta_white -= cap_val
+			# [보호받지 않는 기물 포획 보너스]
+			var is_cap_protected = _is_tile_attacked_by_enemy(target_tile, piece.name.begins_with("B_"), board_manager.current_board_state)
+			if not is_cap_protected:
+				delta_black += _get_piece_value(cap_p) * 10.0 * WEIGHT_UNPROTECTED_CAPTURE_BONUS
+		
+		# [위협 제거 보너스 (Threat Removal Bonus)]
+		# 하위 기물로 상위 기물(아군)에 가해지던 위협을 제거한 경우 보너스
+		var mover_val = _get_piece_value(piece)
+		if cache_piece_controls.has(cap_p.name):
+			for c_tile in cache_piece_controls[cap_p.name]:
+				if board_manager.current_board_state.has(c_tile):
+					var saved_p = board_manager.current_board_state[c_tile]
+					if is_instance_valid(saved_p) and (saved_p.name.begins_with("B_") == piece.name.begins_with("B_")):
+						var saved_val = _get_piece_value(saved_p)
+						# 나보다 가치가 높은 아군을 구출했는가?
+						if mover_val < saved_val:
+							var bonus = saved_val * 10.0 * WEIGHT_THREAT_REMOVAL_BONUS
+							if piece.name.begins_with("B_"): delta_black += bonus
+							else: delta_white += bonus
 		
 	# 2. 선 관통(Ray) 변화 및 타겟 변경에 의한 통제력 재계산 대상 식별
 	var recalc_set = {}
@@ -239,10 +261,14 @@ func _calc_piece_ctrl_pts(piece: Node, is_black: bool, controls: Array[String], 
 			var tp = board[c_tile]
 			if is_instance_valid(tp):
 				if is_black == tp.name.begins_with("B_"):
+					var def_val = _get_piece_value(tp)
+					if tp.is_in_group("VIP_Target") or "King" in tp.name:
+						def_val = 0.0 # 킹(메인 타겟)은 포획 시 게임 오버이므로 '교환'을 가정한 방어 점수 산정에서 제외
+						
 					if _is_tile_attacked_by_enemy(c_tile, is_black, board):
-						pts += _get_piece_value(tp) * WEIGHT_ACTIVE_DEFENSE_RATIO
+						pts += def_val * WEIGHT_ACTIVE_DEFENSE_RATIO
 					else:
-						pts += _get_piece_value(tp) * WEIGHT_DEFENSE_RATIO
+						pts += def_val * WEIGHT_DEFENSE_RATIO
 				else:
 					pts += _get_piece_value(tp) * WEIGHT_THREAT_RATIO
 	return pts
