@@ -108,7 +108,20 @@ func _unhandled_input(event: InputEvent) -> void:
 		if selected_piece:
 			# 이미 기물이 선택된 상태에서 어딘가를 클릭했을 때 (이동 시도)
 			if current_hovered_tile != "":
+				var piece_tag = "Pawn"
+				if selected_piece.get("data"):
+					piece_tag = selected_piece.get("data").piece_name
+				elif is_instance_valid(selected_piece):
+					var parts = selected_piece.name.split("_")
+					if parts.size() >= 2:
+						piece_tag = parts[1] # W_Knight_1 -> "Knight" 추출
+					
 				if board_manager.attempt_move(selected_piece, current_hovered_tile):
+					# 이동 성공! 토큰 차감 및 행동 횟수 증가
+					board_manager.consume_action_token(piece_tag)
+					if selected_piece.has_method("record_move"):
+						selected_piece.record_move()
+						
 					# 이동 성공! 선택 해제
 					if is_instance_valid(selected_piece) and selected_piece != current_hovered_piece:
 						_set_piece_outline(selected_piece, false)
@@ -127,6 +140,23 @@ func _unhandled_input(event: InputEvent) -> void:
 		if current_hovered_piece:
 			# 기물을 새로 클릭한 경우 -> 선택!
 			if selected_piece != current_hovered_piece:
+				# 기물 선택 전 행동권 및 턴 제한 검사
+				var piece_tag = "Pawn"
+				if current_hovered_piece.get("data"):
+					piece_tag = current_hovered_piece.get("data").piece_name
+				elif is_instance_valid(current_hovered_piece):
+					var parts = current_hovered_piece.name.split("_")
+					if parts.size() >= 2:
+						piece_tag = parts[1] # W_Knight_1 -> "Knight" 추출
+				
+				if not board_manager.has_action_token(piece_tag):
+					info_label.text = "[거절] 해당 기물의 행동권(카드)이 부족합니다!"
+					return
+					
+				if current_hovered_piece.has_method("can_move") and not current_hovered_piece.can_move():
+					info_label.text = "[거절] 이 기물은 이번 턴에 이미 행동했습니다!"
+					return
+					
 				if selected_piece and is_instance_valid(selected_piece) and selected_piece != current_hovered_piece:
 					_set_piece_outline(selected_piece, false)
 				selected_piece = current_hovered_piece

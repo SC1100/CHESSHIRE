@@ -6,7 +6,7 @@ class_name CardManager
 var hand: Array[CardData] = []
 var card_visuals: Array[CardVisual3D] = []
 
-enum State { IDLE, DRAWING, PLAYING, VIEWING }
+enum State {IDLE, DRAWING, PLAYING, VIEWING}
 var current_state: State = State.IDLE
 
 var deck_component: DeckComponent
@@ -23,8 +23,8 @@ var discard_mesh: MeshInstance3D
 var discard_label: Label3D
 
 # 손패 부채꼴 정렬 제어 변수
-var hand_radius: float = 4.0 # 호의 반지름
-var hand_spacing: float = 0.25 # 카드 사이의 각도(라디안)
+var hand_radius: float = 12.0 # 호의 반지름
+var hand_spacing: float = 0.08 # 카드 사이의 각도(라디안)
 
 # 턴 및 드로우 시스템 변수
 var base_draw_amount: int = 4 # 기본 드로우 장수
@@ -39,6 +39,7 @@ var current_cost: int = 4 # 현재 남은 코스트
 var cost_label: Label
 
 func _ready():
+	add_to_group("CardManager")
 	# 사용자가 에디터에서 이동시키지 않아도 자동으로 카메라 앞쪽 하단에 배치되도록 강제 설정
 	position = Vector3(0, -0.6, -1.2) # 카메라 기준 아래로 0.6, 앞으로 1.8미터
 	scale = Vector3(0.3, 0.3, 0.3) # 1미터짜리 거대한 카드를 예쁜 크기로 축소
@@ -97,19 +98,19 @@ func _setup_test_ui():
 	draw_btn.pressed.connect(func(): execute_drawing(1))
 	vbox.add_child(draw_btn)
 	
-	var end_btn = Button.new()
-	end_btn.text = "턴 종료 (테스트)"
-	end_btn.custom_minimum_size = Vector2(200, 60)
-	end_btn.add_theme_font_size_override("font_size", 20)
-	end_btn.pressed.connect(func(): end_turn())
-	vbox.add_child(end_btn)
-	
 	var start_btn = Button.new()
 	start_btn.text = "내 턴 시작 (테스트)"
 	start_btn.custom_minimum_size = Vector2(200, 60)
 	start_btn.add_theme_font_size_override("font_size", 20)
 	start_btn.pressed.connect(func(): start_turn())
 	vbox.add_child(start_btn)
+	
+	var end_btn = Button.new()
+	end_btn.text = "턴 종료 [Space]"
+	end_btn.custom_minimum_size = Vector2(200, 60)
+	end_btn.add_theme_font_size_override("font_size", 20)
+	end_btn.pressed.connect(func(): end_turn())
+	vbox.add_child(end_btn)
 
 # --- 코스트 UI 업데이트 ---
 func _update_cost_ui():
@@ -124,6 +125,11 @@ func start_turn():
 	# 턴 시작 시 코스트 꽉 채우기
 	current_cost = turn_max_cost
 	_update_cost_ui()
+	
+	# 턴 시작 시 보드의 행동권과 기물 상태를 초기화
+	var bm = get_tree().get_first_node_in_group("BoardManager")
+	if bm:
+		bm.reset_all_action_tokens()
 	
 	print("내 턴 시작! 지정된 카드 장수(", turn_draw_amount, "장)를 드로우합니다.")
 	execute_drawing(turn_draw_amount)
@@ -153,6 +159,11 @@ func end_turn():
 	selected_card = null
 	_recalculate_hand_positions()
 	
+	# 카드가 날아가는 애니메이션을 잠시 기다린 후 상대방 턴 호출
+	await get_tree().create_timer(0.5).timeout
+	var ai_runner = get_tree().root.find_child("AITestRunner", true, false)
+	if ai_runner and ai_runner.has_method("_on_enemy_turn"):
+		ai_runner._on_enemy_turn()
 	print("--> 적의 턴으로 넘어갑니다... (미구현. 버튼으로 다시 내 턴 시작 가능)")
 
 
@@ -203,7 +214,7 @@ func _setup_discard_visual():
 	box.size = Vector3(1.0, 1.36, 0.1)
 	collision.shape = box
 	discard_visual.add_child(collision)
-	discard_visual.collision_layer = 2 
+	discard_visual.collision_layer = 2
 	
 	discard_mesh = MeshInstance3D.new()
 	var quad = QuadMesh.new()
@@ -222,7 +233,7 @@ func _setup_discard_visual():
 	discard_label.pixel_size = 0.01
 	discard_label.font_size = 32
 	discard_label.outline_size = 12
-	discard_label.position = Vector3(0, -0.9, 0.05) 
+	discard_label.position = Vector3(0, -0.9, 0.05)
 	discard_visual.add_child(discard_label)
 	
 	# 초기에는 버린 카드가 0장이므로 숨김 처리
@@ -328,7 +339,13 @@ func _recalculate_hand_positions():
 		card.target_rotation = global_transform.basis.get_euler() + local_rot
 
 func _unhandled_input(event: InputEvent):
-	# FSM: 드로우 등 애니메이션 중에는 플레이어의 입력을 완전히 차단
+	# 단축키 처리: 스페이스바를 누르면 턴 종료
+	if event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode == KEY_SPACE:
+			end_turn()
+			return
+			
+	# FSM: 드로우/애니메이션 중에는 플레이어의 마우스/키보드 입력을 완전 차단
 	if current_state != State.IDLE:
 		return
 		
@@ -417,6 +434,20 @@ func _try_play_or_return_card(mouse_pos: Vector2):
 		_update_cost_ui()
 		
 		print("카드 사용됨! : ", data.card_name, " (소모 코스트: ", cost_to_pay, ")")
+		
+		# 기물 행동권(토큰) 부여 처리
+		if CardData.CardType.PIECE == data.type or "Piece" in data.tags:
+			var piece_tag = ""
+			for t in data.tags:
+				if t != "Piece" and t != "VIP_Target":
+					piece_tag = t
+					break
+			if piece_tag != "":
+				var bm = get_tree().get_first_node_in_group("BoardManager")
+				if bm:
+					bm.add_action_token(piece_tag)
+				else:
+					print("[CardManager] BoardManager를 찾을 수 없어 행동권을 부여하지 못했습니다.")
 		
 		# 사용된 카드를 DeckComponent의 버린 카드 더미로 보냅니다.
 		# 만약 "Exhaust" 태그가 있다면 exhaust_card로 보낼 수 있습니다.

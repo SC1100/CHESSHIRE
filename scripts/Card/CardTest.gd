@@ -29,7 +29,7 @@ func _ready() -> void:
 		var c_name = "카드 " + str(i + 1)
 		var c_cost = (i % 3) + 1
 		# CardData의 _init()은 최소 6개의 인자를 요구합니다.
-		var card = CardData.new(c_id, c_name, c_cost, CardData.CardType.SKILL, Rect2(), "테스트 카드입니다.")
+		var card = CardData.new(c_id, c_name, c_cost, CardData.CardType.SKILL, "res://asset/Cards/W_Pawn.png", "테스트 카드입니다.")
 		dummy_deck.append(card)
 		
 	# 5. 전투 시작! (초기 손패 3장 드로우 및 멀리건)

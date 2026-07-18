@@ -3,17 +3,16 @@ extends Node
 
 # AI의 '성격'을 결정하는 조율 변수 (인스펙터에서 적마다 다르게 설정 가능)
 @export var aggressiveness: float = 1.0 # 공격성: 높을수록 무리해서라도 플레이어를 향해 돌격
-@export var survival: float = 1.5       # 생존성: 높을수록 위험한 타일을 극도로 기피함
+@export var survival: float = 1.5 # 생존성: 높을수록 위험한 타일을 극도로 기피함
 
 # ==========================================================
 # 1. 의사결정 루프 진입점 (AI 턴 시작 시 호출됨)
 # ==========================================================
 func decide_next_move(current_pos: Vector2i, piece_type: String, board_manager) -> Vector2i:
-	
 	# [STEP 1] 보드 상태 분석: 
 	# 플레이어가 이번 턴에 공격할 수 있는 '위험 타일(Threat Map)' 목록과
 	# 현재 위치에서 플레이어에게 도달하기 위한 A* 최적 경로를 계산합니다.
-	var threat_map = board_manager.get_threat_map() 
+	var threat_map = board_manager.get_threat_map()
 	var path_to_player = _calculate_astar_path(current_pos, board_manager.player_pos, board_manager)
 	
 	# [STEP 2] 이동 가능 반경 탐색:
@@ -53,7 +52,7 @@ func _evaluate_move(target: Vector2i, path: Array, threat_map: Dictionary, board
 	if target in path:
 		# 경로 배열의 뒤쪽(플레이어에게 가까운 쪽)일수록 더 높은 보너스 점수 부여
 		var path_index = path.find(target)
-		score += 50.0 + (path_index * 10.0) 
+		score += 50.0 + (path_index * 10.0)
 		
 	# [가중치 3] 생존 본능 (영향력 맵 연동):
 	# 이 타일로 이동했을 때 플레이어에게 역으로 죽을 위험이 있는가?

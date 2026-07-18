@@ -31,12 +31,44 @@ var highlight_nodes: Array[Node] = []
 var current_valid_moves: Array[String] = []
 var highlight_material: StandardMaterial3D
 
+# --- Action Tokens ---
+var active_tokens: Dictionary = {
+	"Pawn": 0, "Knight": 0, "Bishop": 0, "Rook": 0, "Queen": 0, "King": 0
+}
+
+func add_action_token(piece_tag: String, amount: int = 1) -> void:
+	if active_tokens.has(piece_tag):
+		active_tokens[piece_tag] += amount
+		print("[BoardManager] %s 행동권 추가됨! 현재 남은 행동권: %d" % [piece_tag, active_tokens[piece_tag]])
+	else:
+		push_warning("알 수 없는 기물 토큰 추가 시도: " + piece_tag)
+
+func consume_action_token(piece_tag: String) -> bool:
+	if active_tokens.has(piece_tag) and active_tokens[piece_tag] > 0:
+		active_tokens[piece_tag] -= 1
+		print("[BoardManager] %s 행동권 소모됨. 남은 행동권: %d" % [piece_tag, active_tokens[piece_tag]])
+		return true
+	return false
+
+func has_action_token(piece_tag: String) -> bool:
+	return active_tokens.has(piece_tag) and active_tokens[piece_tag] > 0
+
+func reset_all_action_tokens() -> void:
+	for key in active_tokens.keys():
+		active_tokens[key] = 0
+	
+	# 모든 기물의 개인 이동 횟수 초기화
+	for piece in current_board_state.values():
+		if is_instance_valid(piece) and piece is Piece:
+			piece.reset_moves()
+
 func get_piece_name_on_tile(tile_name: String) -> String:
 	if current_board_state.has(tile_name) and is_instance_valid(current_board_state[tile_name]):
 		return current_board_state[tile_name].name
 	return ""
 
 func _ready():
+	add_to_group("BoardManager")
 	board_grid = get_node(board_grid_path)
 	if not board_grid:
 		push_error("BoardManager: 보드 그리드를 찾을 수 없습니다!")
@@ -110,6 +142,13 @@ func load_stage(stage_id: String):
 			
 		# 기물 복제(인스턴스화)
 		var piece_instance = piece_scenes[piece_key].instantiate()
+		
+		# Piece.gd 스크립트가 없다면 강제로 부착
+		var piece_script = preload("res://scripts/Piece.gd")
+		if piece_instance.get_script() != piece_script:
+			piece_instance.set_script(piece_script)
+			piece_instance.set("move_count", 0)
+			piece_instance.set("max_moves", 1)
 		
 		# 씬 트리에 추가 및 고유 이름 설정 (예: B_Pawn_1)
 		piece_instance.name = piece_key + "_" + str(piece_counts[piece_key])

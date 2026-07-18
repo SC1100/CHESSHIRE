@@ -14,6 +14,8 @@ var is_player_turn = true
 @export var WEIGHT_ACTIVE_DEFENSE_RATIO: float = 0.2 # 적에게 공격받는 아군을 방어할 때의 점수 비율 (20%)
 @export var WEIGHT_THREAT_REMOVAL_BONUS: float = 0.3 # 하위 기물로 상위 기물의 위협을 제거할 때 얻는 보너스 비율 (30%)
 @export var WEIGHT_UNPROTECTED_CAPTURE_BONUS: float = 0.3 # 보호받지 않는 적 기물을 포획할 때 얻는 추가 보너스 비율 (30%)
+
+@export var ai_actions_per_turn: int = 2 # AI가 한 턴에 수행할 행동(이동) 횟수
 # ==========================================
 
 # --- 캐싱(Incremental Evaluation) 전용 상태 ---
@@ -24,17 +26,18 @@ var cache_piece_control_pts: Dictionary = {}
 var cache_tile_threats: Dictionary = {}
 
 func _ready():
-	# 턴 넘기기 버튼 UI 생성
-	var canvas = CanvasLayer.new()
-	add_child(canvas)
-	
-	var btn = Button.new()
-	btn.text = "턴 넘기기 (AI 행동) [Z]"
-	btn.position = Vector2(20, 100)
-	btn.size = Vector2(300, 60)
-	btn.add_theme_font_size_override("font_size", 24)
-	btn.pressed.connect(_on_enemy_turn)
-	canvas.add_child(btn)
+	# CardManager에 이미 턴 종료 버튼이 있으므로 중복되는 테스트 UI 생성 코드는 주석 처리합니다.
+	# 향후 AI 단독 테스트가 필요할 때 아래 주석을 해제하세요.
+	#var canvas = CanvasLayer.new()
+	#add_child(canvas)
+	#
+	#var btn = Button.new()
+	#btn.text = "턴 넘기기 (AI 행동) [Z]"
+	#btn.position = Vector2(1250, 550)
+	#btn.size = Vector2(300, 60)
+	#btn.add_theme_font_size_override("font_size", 24)
+	#btn.pressed.connect(_on_enemy_turn)
+	#canvas.add_child(btn)
 	
 	# 임시 테스트: 게임 시작 시 필드에 있는 킹들에게 'VIP_Target' 태그 부여
 	# 나중에는 맵 에디터에서 마차나 크리스탈 같은 오브젝트에 직접 이 그룹을 할당하면 됩니다.
@@ -55,62 +58,83 @@ func _on_enemy_turn():
 	if not is_player_turn: return
 	is_player_turn = false
 	
-	# 모든 흑색 기물 찾기
-	var black_pieces = []
-	for tile in board_manager.current_board_state:
-		var piece = board_manager.current_board_state[tile]
-		if is_instance_valid(piece) and piece.name.begins_with("B_"):
-			black_pieces.append(piece)
+	# 턴 시작 시 모든 기물의 이번 턴 행동 횟수를 초기화 (AI 및 플레이어)
+	for piece in board_manager.current_board_state.values():
+		if is_instance_valid(piece) and piece.has_method("reset_moves"):
+			piece.reset_moves()
 			
-	if black_pieces.is_empty():
-		print("남은 적 기물이 없습니다.")
-		is_player_turn = true
-		return
-		
-	# 시뮬레이션 전, 전체 보드를 1회만 순회하여 캐시를 생성합니다.
-	_build_cache(board_manager.current_board_state)
-		
-	var best_piece = null
-	var best_tile = ""
-	var highest_score = -9999.0
-	
-	# 모든 흑색 기물의 유효한 이동을 순회하여 가장 높은 점수의 행동을 하나 고름
-	for piece in black_pieces:
-		var start_tile = board_manager.get_tile_of_piece(piece)
-		
-		var valid_tiles: Array[String] = []
-		
-		var cols = ["a", "b", "c", "d", "e", "f", "g", "h"]
-		for col in cols:
-			for row in range(1, 9):
-				var target = col + str(row)
-				if ChessRules.is_move_valid(piece.name, start_tile, target, board_manager.current_board_state):
-					valid_tiles.append(target)
-					
-		# 해당 기물의 각 후보지에 대해 채점 (보드 시뮬레이터로 넘김)
-		for target in valid_tiles:
-			var score = _simulate_and_evaluate(piece, start_tile, target)
-			
-			# 약간의 난수를 더해 동점일 때 기계적 반복 회피
-			score += randf_range(-1.0, 1.0)
-			
-			if score > highest_score:
-				highest_score = score
-				best_tile = target
-				best_piece = piece
+	for action_idx in range(ai_actions_per_turn):
+		# 모든 흑색 기물 찾기 (이번 턴에 아직 행동하지 않은 기물만)
+		var black_pieces = []
+		for tile in board_manager.current_board_state:
+			var piece = board_manager.current_board_state[tile]
+			if is_instance_valid(piece) and piece.name.begins_with("B_"):
+				if piece.has_method("can_move") and not piece.can_move():
+					continue # 이미 행동한 기물은 제외
+				black_pieces.append(piece)
 				
-	if best_piece == null:
-		print("AI: 아무 기물도 이동할 곳이 없습니다.")
-		is_player_turn = true
-		return
+		if black_pieces.is_empty():
+			print("AI: 남은 적 기물이 없거나 모두 행동을 완료했습니다.")
+			break
 			
-	# 이동 실행
-	board_manager.current_valid_moves.clear()
-	board_manager.current_valid_moves.append(best_tile) # Manager 내부 검증 통과용
-	board_manager.attempt_move(best_piece, best_tile)
-	print("AI 결정: ", best_piece.name, " ➔ ", best_tile, " (가치 점수: ", round(highest_score), ")")
-	
+		# 시뮬레이션 전, 전체 보드를 1회만 순회하여 캐시를 생성합니다.
+		_build_cache(board_manager.current_board_state)
+			
+		var best_piece = null
+		var best_tile = ""
+		var highest_score = -9999.0
+		
+		# 모든 흑색 기물의 유효한 이동을 순회하여 가장 높은 점수의 행동을 하나 고름
+		for piece in black_pieces:
+			var start_tile = board_manager.get_tile_of_piece(piece)
+			
+			var valid_tiles: Array[String] = []
+			
+			var cols = ["a", "b", "c", "d", "e", "f", "g", "h"]
+			for col in cols:
+				for row in range(1, 9):
+					var target = col + str(row)
+					if ChessRules.is_move_valid(piece.name, start_tile, target, board_manager.current_board_state):
+						valid_tiles.append(target)
+						
+			# 해당 기물의 각 후보지에 대해 채점 (보드 시뮬레이터로 넘김)
+			for target in valid_tiles:
+				var score = _simulate_and_evaluate(piece, start_tile, target)
+				
+				# 약간의 난수를 더해 동점일 때 기계적 반복 회피
+				score += randf_range(-1.0, 1.0)
+				
+				if score > highest_score:
+					highest_score = score
+					best_tile = target
+					best_piece = piece
+					
+		if best_piece == null:
+			print("AI: 아무 기물도 이동할 곳이 없습니다.")
+			break
+				
+		# 이동 실행
+		board_manager.current_valid_moves.clear()
+		board_manager.current_valid_moves.append(best_tile) # Manager 내부 검증 통과용
+		board_manager.attempt_move(best_piece, best_tile)
+		
+		# 행동 횟수 증가 처리 (기물 1회 제한 룰 적용)
+		if best_piece.has_method("record_move"):
+			best_piece.record_move()
+			
+		print("AI 결정 (%d/%d): %s ➔ %s (가치 점수: %d)" % [action_idx + 1, ai_actions_per_turn, best_piece.name, best_tile, round(highest_score)])
+		
+		# 다음 행동을 하기 전에 애니메이션을 볼 수 있도록 약간 대기
+		if action_idx < ai_actions_per_turn - 1:
+			await get_tree().create_timer(0.4).timeout
+			
 	is_player_turn = true
+	print("AI 턴 종료. 플레이어의 턴입니다.")
+	
+	# 상대방 행동이 모두 끝났으므로 내 턴을 시작합니다.
+	var cm = get_tree().get_first_node_in_group("CardManager")
+	if cm and cm.has_method("start_turn"):
+		cm.start_turn()
 
 func _simulate_and_evaluate(piece: Node, start_tile: String, target_tile: String) -> float:
 	var sim_board = board_manager.current_board_state.duplicate()
@@ -251,7 +275,7 @@ func _get_base_score(piece: Node, tile: String) -> float:
 	return val
 
 # 기물의 통제력(Grid Control) 점수 산출
-func _calc_piece_ctrl_pts(piece: Node, is_black: bool, controls: Array[String], board: Dictionary) -> float:
+func _calc_piece_ctrl_pts(_piece: Node, is_black: bool, controls: Array[String], board: Dictionary) -> float:
 	var pts = 0.0
 	for c_tile in controls:
 		pts += _get_static_tile_value(c_tile)

@@ -23,12 +23,9 @@ func _init(_data: CardData):
 	# 매테리얼 설정
 	var mat = StandardMaterial3D.new()
 	
-	# 3D MeshInstance에서는 AtlasTexture의 잘라내기(Region)가 자동으로 적용되지 않으므로, UV 좌표를 직접 조절합니다.
+	# 개별 이미지 텍스처를 적용합니다.
 	var tex = data.get_texture()
-	var atlas_size = tex.atlas.get_size()
-	mat.albedo_texture = tex.atlas # 원본 통짜 이미지 할당
-	mat.uv1_scale = Vector3(tex.region.size.x / atlas_size.x, tex.region.size.y / atlas_size.y, 1.0)
-	mat.uv1_offset = Vector3(tex.region.position.x / atlas_size.x, tex.region.position.y / atlas_size.y, 0.0)
+	mat.albedo_texture = tex
 	
 	mat.cull_mode = BaseMaterial3D.CULL_BACK # 뒷면은 안 보이도록(뒷면용 메쉬 따로 생성)
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED # 빛 영향 없이 선명하게 보이도록 설정
