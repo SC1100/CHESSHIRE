@@ -15,6 +15,13 @@ func can_move() -> bool:
 func record_move() -> void:
 	move_count += 1
 
+func get_team() -> PieceData.Team:
+	if data:
+		return data.team
+	if name.begins_with("B_"):
+		return PieceData.Team.BLACK
+	return PieceData.Team.WHITE
+
 func _ready() -> void:
 	# 나중에 여기에 "바닥(Y-)으로 레이를 쏴서 현재 칸 인식 후 BoardManager에 등록" 하는 로직이 들어갑니다.
 	if data:

@@ -140,6 +140,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		if current_hovered_piece:
 			# 기물을 새로 클릭한 경우 -> 선택!
 			if selected_piece != current_hovered_piece:
+				# 아군 기물인지 검사 (플레이어 진영 기물만 조작 가능)
+				if not board_manager.is_player_piece(current_hovered_piece):
+					info_label.text = "[거절] 아군 기물만 선택할 수 있습니다!"
+					return
+					
 				# 기물 선택 전 행동권 및 턴 제한 검사
 				var piece_tag = "Pawn"
 				if current_hovered_piece.get("data"):

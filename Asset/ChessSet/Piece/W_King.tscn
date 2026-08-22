@@ -3,7 +3,6 @@
 [ext_resource type="Texture2D" uid="uid://hespvdugicuj" path="res://Asset/ChessSet/Piece/piece_Image_1.jpg" id="1_edtf3"]
 [ext_resource type="Script" uid="uid://d25u2lwd2pld7" path="res://components/GridDetectorComponent.gd" id="grid_detector_script"]
 
-
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_kj0nw"]
 resource_name = "02_-_Default"
 cull_mode = 2
@@ -61,33 +60,33 @@ points = PackedVector3Array(-13.645571, -6.9177513, 34.333733, 14.764906, 4.9153
 points = PackedVector3Array(10.027509, 23.857021, 15.386229, 24.231821, -6.917288, -1.1837692, -23.112486, 9.652709, -1.1837692, 12.393195, -11.64866, 24.859169, -18.376015, 7.2870235, 22.488384, 7.6618233, 23.857021, -1.1837692, 10.027509, -23.487286, -1.1837692, -20.7468, -14.0194435, -1.1837692, 24.231821, 9.652709, 15.386229, -23.112486, -11.64866, 15.386229, -11.27386, 23.857021, 15.386229, 21.866135, -16.38513, 13.017994, -8.908174, 14.389179, 24.859169, -11.27386, -16.38513, 22.488384, 10.027509, -23.487286, 15.386229, 17.129665, 19.12055, -1.1837692, -23.112486, 12.018395, 15.386229, -13.644644, 21.491335, -1.1837692, -13.644644, -23.487286, 13.017994, 12.335888, 6.072978, 22.633274, -8.908174, -23.487286, -1.1837692, 24.231821, -9.282973, 15.386229, 24.231821, 7.2870235, -1.1837692, 17.129665, 21.491335, 13.017994, -18.376015, 19.12055, 15.386229, -18.376015, -6.917288, 22.488384, 19.49535, -16.38513, -1.1837692, -23.112486, -9.282973, -1.1837692, -6.542488, 23.857021, -1.1837692, 21.866135, 14.389179, 15.386229, 6.4820957, 12.029724, 22.696194, -18.376015, -18.750814, 15.386229)
 
 [node name="Node3D" type="Node3D" unique_id=1580500356]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 0, 0, 0)
 
 [node name="W_King_02 - Default_0" type="MeshInstance3D" parent="." unique_id=726080973]
-transform = Transform3D(1, 0, 0, 0, -3.5762787e-07, 0.99999994, 0, -0.99999994, -3.5762787e-07, 0, 0, 0)
+transform = Transform3D(0.99999994, 0, 0, 0, -4.3711385e-08, 0.9999999, 0, -0.99999994, -4.3711385e-08, 0, 0, 0)
 mesh = SubResource("ArrayMesh_k6m5t")
 
 [node name="Area3D" type="Area3D" parent="W_King_02 - Default_0" unique_id=1369047356]
 
 [node name="CollisionShape3D5" type="CollisionShape3D" parent="W_King_02 - Default_0/Area3D" unique_id=778133447]
-transform = Transform3D(1, 0, 0, 0, 0.99999994, -2.842171e-14, 0, 2.842171e-14, 0.99999994, 0, 0, 0)
+transform = Transform3D(1, 0, 0, 0, 0.99999994, 0, 0, 0, 0.99999994, 0, 0, 0)
 shape = SubResource("ConvexPolygonShape3D_6miud")
 
 [node name="CollisionShape3D4" type="CollisionShape3D" parent="W_King_02 - Default_0/Area3D" unique_id=488684249]
-transform = Transform3D(1, 0, 0, 0, 0.99999994, -2.842171e-14, 0, 2.842171e-14, 0.99999994, 0, 0, 0)
+transform = Transform3D(1, 0, 0, 0, 0.99999994, 0, 0, 0, 0.99999994, 0, 0, 0)
 shape = SubResource("ConvexPolygonShape3D_3dn03")
 
 [node name="CollisionShape3D3" type="CollisionShape3D" parent="W_King_02 - Default_0/Area3D" unique_id=1531760339]
-transform = Transform3D(1, 0, 0, 0, 0.99999994, -2.842171e-14, 0, 2.842171e-14, 0.99999994, 0, 0, 0)
+transform = Transform3D(1, 0, 0, 0, 0.99999994, 0, 0, 0, 0.99999994, 0, 0, 0)
 shape = SubResource("ConvexPolygonShape3D_y0h1y")
 
 [node name="CollisionShape3D2" type="CollisionShape3D" parent="W_King_02 - Default_0/Area3D" unique_id=913994712]
-transform = Transform3D(1, 0, 0, 0, 0.99999994, -2.842171e-14, 0, 2.842171e-14, 0.99999994, 0, 0, 0)
+transform = Transform3D(1, 0, 0, 0, 0.99999994, 0, 0, 0, 0.99999994, 0, 0, 0)
 shape = SubResource("ConvexPolygonShape3D_41vps")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="W_King_02 - Default_0/Area3D" unique_id=549295734]
-transform = Transform3D(1, 0, 0, 0, 0.99999994, -2.842171e-14, 0, 2.842171e-14, 0.99999994, 0, 0, 0)
+transform = Transform3D(1, 0, 0, 0, 0.99999994, 0, 0, 0, 0.99999994, 0, 0, 0)
 shape = SubResource("ConvexPolygonShape3D_6vyf1")
 
-
-[node name="GridDetectorComponent" type="RayCast3D" parent="."]
+[node name="GridDetectorComponent" type="RayCast3D" parent="." unique_id=1102313039]
 script = ExtResource("grid_detector_script")

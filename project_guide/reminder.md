@@ -36,7 +36,7 @@
 *   모든 카드는 이름(String)이 아닌 **`id` (고유 문자열 ID, 예: "searing_blade")**를 기준으로 통신합니다.
 *   **특수 코스트 (X 코스트)**: 코스트가 가변적인 카드는 숫자 대신 `COST_X (-1)` 상수를 코스트로 가집니다. 동시에 `tags` 배열에 `"X_Cost"` 태그를 반드시 포함하여, 카드 사용 시 마나 시스템이 이 태그를 인식하고 남은 마나를 모두 소모하도록 데이터 주도적으로 설계합니다.
 *   `DeckComponent`는 원본 데이터를 훼손하지 않기 위해 `draw_pile`, `discard_pile`, `exhaust_pile` 배열을 자체적으로 복사하여 셔플/관리합니다.
-*   **통신 원칙**: 노드 간 통신은 트리 경로 하드코딩이 아닌 `signal`을 통해서만 이루어집니다. (예: `DeckComponent`의 `counts_changed` 시그널로 3D 덱 뭉치 UI 업데이트)
+*   **플레이어 진영(Player Team) 제어**: `BoardManager.gd`의 `@export var player_team: PieceData.Team` 변수로 플레이어가 플레이할 진영(WHITE/BLACK)을 결정합니다. 카드 사용 시 얻는 행동 토큰 및 기물 조작(`BoardInput.gd`)은 오직 `is_player_piece()`를 통과한 플레이어 진영의 기물에만 적용되며, 적 AI(`AITestRunner.gd`) 역시 상대 진영 기물을 자동으로 식별하여 조작합니다.
 
 ---
 

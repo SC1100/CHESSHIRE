@@ -68,7 +68,7 @@ func _on_enemy_turn():
 		var black_pieces = []
 		for tile in board_manager.current_board_state:
 			var piece = board_manager.current_board_state[tile]
-			if is_instance_valid(piece) and piece.name.begins_with("B_"):
+			if is_instance_valid(piece) and not board_manager.is_player_piece(piece):
 				if piece.has_method("can_move") and not piece.can_move():
 					continue # 이미 행동한 기물은 제외
 				black_pieces.append(piece)

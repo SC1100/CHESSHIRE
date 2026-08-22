@@ -31,6 +31,21 @@ var highlight_nodes: Array[Node] = []
 var current_valid_moves: Array[String] = []
 var highlight_material: StandardMaterial3D
 
+# --- Player Team Control ---
+@export var player_team: PieceData.Team = PieceData.Team.WHITE
+
+# 기물이 플레이어 진영(아군)인지 판별하는 헬퍼 함수
+func is_player_piece(piece: Node) -> bool:
+	if not is_instance_valid(piece): return false
+	if piece.has_method("get_team"):
+		return piece.get_team() == player_team
+	if piece.get("data") and piece.get("data").get("team") != null:
+		return piece.get("data").team == player_team
+	if player_team == PieceData.Team.WHITE:
+		return piece.name.begins_with("W_")
+	else:
+		return piece.name.begins_with("B_")
+
 # --- Action Tokens ---
 var active_tokens: Dictionary = {
 	"Pawn": 0, "Knight": 0, "Bishop": 0, "Rook": 0, "Queen": 0, "King": 0
