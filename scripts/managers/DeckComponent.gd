@@ -10,20 +10,19 @@ var draw_pile: Array[String] = []
 var discard_pile: Array[String] = []
 var exhaust_pile: Array[String] = []
 
-# 게임/스테이지 시작 시 플레이어 세이브 데이터를 기반으로 덱을 초기화합니다.
-func initialize(player_data: PlayerData):
+# 문자열 배열 덱을 기반으로 덱을 초기화합니다.
+func initialize_from_deck_list(deck_list: Array[String]):
 	draw_pile.clear()
 	discard_pile.clear()
 	exhaust_pile.clear()
-	
-	# 플레이어 데이터의 덱을 복사해옵니다. (원본 배열 손상 방지를 위해 duplicate 사용)
-	draw_pile = player_data.deck_card_ids.duplicate()
-	
-	# 엔진 내장 셔플 기능으로 무작위로 섞습니다.
+	draw_pile = deck_list.duplicate()
 	draw_pile.shuffle()
-	
 	_update_counts()
 	print("덱 초기화 완료! 현재 남은 카드 수: ", draw_pile.size())
+
+# 게임/스테이지 시작 시 플레이어 세이브 데이터를 기반으로 덱을 초기화합니다.
+func initialize(player_data: PlayerData):
+	initialize_from_deck_list(player_data.deck_card_ids)
 
 # 카드 한 장을 뽑아 그 ID를 반환합니다.
 func draw_card() -> String:

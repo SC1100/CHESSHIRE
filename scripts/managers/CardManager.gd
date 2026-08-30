@@ -63,8 +63,11 @@ func _ready():
 	_setup_discard_visual()
 	deck_component.counts_changed.connect(_on_counts_changed)
 	
-	var p_data = PlayerData.load_data()
-	deck_component.initialize(p_data)
+	var master_deck = ProfileManager.get_master_deck()
+	if master_deck.is_empty():
+		var p_data = PlayerData.load_data()
+		master_deck = p_data.deck_card_ids
+	deck_component.initialize_from_deck_list(master_deck)
 			
 	# 게임 시작 시 첫 턴 강제 시작
 	start_turn()
@@ -439,7 +442,7 @@ func _try_play_or_return_card(mouse_pos: Vector2):
 		if CardData.CardType.PIECE == data.type or "Piece" in data.tags:
 			var piece_tag = ""
 			for t in data.tags:
-				if t != "Piece" and t != "VIP_Target":
+				if t != "Piece" and t != "Objective":
 					piece_tag = t
 					break
 			if piece_tag != "":

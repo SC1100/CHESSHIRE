@@ -39,7 +39,7 @@ static func _static_init():
 	_register("w_bishop", "White Bishop", 2, CardType.PIECE, "res://asset/Cards/W_Bishop.png", "대각선으로 원하는 만큼 이동합니다.", ["Piece", "Bishop"])
 	_register("w_rook", "White Rook", 2, CardType.PIECE, "res://asset/Cards/W_Rook.png", "가로 및 세로로 원하는 만큼 이동합니다.", ["Piece", "Rook"])
 	_register("w_queen", "White Queen", 2, CardType.PIECE, "res://asset/Cards/W_Queen.png", "상하좌우 및 대각선으로 원하는 만큼 이동합니다.", ["Piece", "Queen"])
-	_register("w_king", "White King", 1, CardType.PIECE, "res://asset/Cards/W_King.png", "모든 방향으로 1칸 이동합니다. 체스의 메인 타겟입니다.", ["Piece", "King", "VIP_Target"])
+	_register("w_king", "White King", 1, CardType.PIECE, "res://asset/Cards/W_King.png", "모든 방향으로 1칸 이동합니다. 체스의 메인 타겟입니다.", ["Piece", "King", "Objective"])
 
 static func _register(_id: String, _name: String, _cost: int, _type: CardType, _image_path: String, _desc: String, _tags: Array[String] = []):
 	database[_id] = CardData.new(_id, _name, _cost, _type, _image_path, _desc, _tags)

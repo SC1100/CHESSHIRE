@@ -1,0 +1,81 @@
+[gd_scene format=3 uid="uid://cd3gcwug7fwy3"]
+
+[ext_resource type="Script" uid="uid://cwr7jpuhg2hdr" path="res://scripts/ui/TitleManager.gd" id="1_title"]
+[ext_resource type="Texture2D" uid="uid://i248fj10opex" path="res://Asset/Title/ChesshireTitle.png" id="2_itwpq"]
+
+[sub_resource type="LabelSettings" id="LabelSettings_31t38"]
+font_size = 80
+
+[node name="TitleScene" type="Control" unique_id=376014507]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_title")
+
+[node name="TitleLabel" type="Label" parent="." unique_id=1407767415]
+layout_mode = 0
+offset_left = 60.0
+offset_top = 60.0
+offset_right = 484.0
+offset_bottom = 170.0
+theme_override_font_sizes/font_size = 56
+text = "CHESSHIRE"
+label_settings = SubResource("LabelSettings_31t38")
+
+[node name="TextureRect" type="TextureRect" parent="." unique_id=235374632]
+layout_mode = 1
+anchors_preset = -1
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -25.0
+offset_right = 25.0
+texture = ExtResource("2_itwpq")
+expand_mode = 1
+metadata/_edit_use_anchors_ = true
+
+[node name="ButtonContainer" type="VBoxContainer" parent="." unique_id=2140470070]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -200.0
+offset_top = -50.0
+offset_right = 200.0
+offset_bottom = 210.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 15
+metadata/_edit_use_anchors_ = true
+
+[node name="NewGameButton" type="Button" parent="ButtonContainer" unique_id=187193623]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(220, 50)
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "New Game"
+
+[node name="ContinueButton" type="Button" parent="ButtonContainer" unique_id=1316673615]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(220, 50)
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "Continue"
+
+[node name="OptionButton" type="Button" parent="ButtonContainer" unique_id=2025395092]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(220, 50)
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "Option"
+
+[node name="QuitButton" type="Button" parent="ButtonContainer" unique_id=1537556647]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(220, 50)
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "Quit"

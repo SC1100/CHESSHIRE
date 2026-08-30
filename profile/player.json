@@ -1,0 +1,33 @@
+{
+	"current_run": {
+		"current_stage_id": "stage2",
+		"hp": 100.0,
+		"is_in_run": true,
+		"master_deck": [
+			"w_pawn",
+			"w_pawn",
+			"w_pawn",
+			"w_knight",
+			"w_bishop",
+			"w_rook",
+			"w_queen",
+			"w_king"
+		]
+	},
+	"permanent_data": {
+		"total_runs": 1.0,
+		"unlocked_cards": [
+			"w_pawn",
+			"w_knight",
+			"w_bishop",
+			"w_rook",
+			"w_queen",
+			"w_king"
+		],
+		"wins": 0.0
+	},
+	"profile_info": {
+		"created_at": "2026-08-30T20:10:58",
+		"nickname": "player"
+	}
+}

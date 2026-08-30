@@ -39,12 +39,12 @@ func _ready():
 	#btn.pressed.connect(_on_enemy_turn)
 	#canvas.add_child(btn)
 	
-	# 임시 테스트: 게임 시작 시 필드에 있는 킹들에게 'VIP_Target' 태그 부여
+	# 임시 테스트: 게임 시작 시 필드에 있는 킹들에게 'Objective' 태그 부여
 	# 나중에는 맵 에디터에서 마차나 크리스탈 같은 오브젝트에 직접 이 그룹을 할당하면 됩니다.
 	for tile in board_manager.current_board_state:
 		var p = board_manager.current_board_state[tile]
 		if is_instance_valid(p) and "King" in p.name:
-			p.add_to_group("VIP_Target")
+			p.add_to_group("Objective")
 			
 	print("AITestRunner: 격리된 테스트 환경(타겟 시스템 포함)이 준비되었습니다.")
 
@@ -82,7 +82,7 @@ func _on_enemy_turn():
 			
 		var best_piece = null
 		var best_tile = ""
-		var highest_score = -9999.0
+		var highest_score = -INF
 		
 		# 모든 흑색 기물의 유효한 이동을 순회하여 가장 높은 점수의 행동을 하나 고름
 		for piece in black_pieces:
@@ -141,7 +141,7 @@ func _simulate_and_evaluate(piece: Node, start_tile: String, target_tile: String
 	var cap_p = null
 	if sim_board.has(target_tile):
 		cap_p = sim_board[target_tile]
-		if cap_p.is_in_group("VIP_Target"): return 9999999.0
+		if cap_p.is_in_group("Objective"): return 9999999.0
 		sim_board.erase(target_tile)
 	
 	sim_board.erase(start_tile)
@@ -235,10 +235,10 @@ func _build_cache(board: Dictionary):
 	var b_score = 0.0
 	var w_score = 0.0
 	
-	# VIP 위치 식별
+	# VIP(Objective) 위치 식별
 	for tile in board:
 		var p = board[tile]
-		if is_instance_valid(p) and p.is_in_group("VIP_Target") and p.name.begins_with("W_"):
+		if is_instance_valid(p) and p.is_in_group("Objective") and p.name.begins_with("W_"):
 			cache_white_vips.append(tile)
 			
 	for tile in board:
@@ -268,8 +268,8 @@ func _build_cache(board: Dictionary):
 # 기물의 기본 가치 + VIP 근접 가중치 계산
 func _get_base_score(piece: Node, tile: String) -> float:
 	var val = _get_piece_value(piece) * 10.0
-	# 자신이 킹(VIP)인 경우 사냥개가 아니므로 거리 보너스를 받지 않음
-	if piece.name.begins_with("B_") and not piece.is_in_group("VIP_Target"):
+	# 자신이 킹(Objective)인 경우 사냥개가 아니므로 거리 보너스를 받지 않음
+	if piece.name.begins_with("B_") and not piece.is_in_group("Objective"):
 		for vip in cache_white_vips:
 			val += (14.0 - _get_manhattan_distance(tile, vip)) * WEIGHT_PROXIMITY_BONUS
 	return val
@@ -286,7 +286,7 @@ func _calc_piece_ctrl_pts(_piece: Node, is_black: bool, controls: Array[String],
 			if is_instance_valid(tp):
 				if is_black == tp.name.begins_with("B_"):
 					var def_val = _get_piece_value(tp)
-					if tp.is_in_group("VIP_Target") or "King" in tp.name:
+					if tp.is_in_group("Objective") or "King" in tp.name:
 						def_val = 0.0 # 킹(메인 타겟)은 포획 시 게임 오버이므로 '교환'을 가정한 방어 점수 산정에서 제외
 						
 					if _is_tile_attacked_by_enemy(c_tile, is_black, board):
@@ -356,7 +356,7 @@ func _is_near_enemy(tile: String, is_black: bool, board: Dictionary) -> bool:
 # 기물별 가중치 반환 함수 (Node를 인자로 받아 그룹 검사)
 func _get_piece_value(piece: Node) -> float:
 	# 그룹 부여가 누락되는 초기화 시점 버그를 대비한 안전장치(Fallback)
-	if piece.is_in_group("VIP_Target") or "King" in piece.name:
+	if piece.is_in_group("Objective") or "King" in piece.name:
 		return 99999.0
 		
 	# 정체 현상(오실레이션) 해결을 위해 통제력 대비 기물 가치를 5배 상향 조정

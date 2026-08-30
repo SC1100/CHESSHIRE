@@ -1,0 +1,83 @@
+[gd_scene format=3 uid="uid://dnhamh2q13bln"]
+
+[ext_resource type="Script" uid="uid://cqmfa6iks1f34" path="res://scripts/ui/StageManager.gd" id="1_stage"]
+[ext_resource type="Texture2D" uid="uid://i248fj10opex" path="res://Asset/Title/ChesshireTitle.png" id="2_bg"]
+
+[sub_resource type="Shader" id="Shader_blur"]
+code = "shader_type canvas_item;
+uniform sampler2D screen_texture : hint_screen_texture, filter_linear_mipmap;
+uniform float lod: hint_range(0.0, 5.0) = 2.5;
+
+void fragment() {
+	COLOR = textureLod(screen_texture, SCREEN_UV, lod);
+}
+"
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_blur"]
+shader = SubResource("Shader_blur")
+shader_parameter/lod = 2.5
+
+[node name="StageScene" type="Control" unique_id=18784908]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_stage")
+
+[node name="Background" type="TextureRect" parent="." unique_id=686055527]
+modulate = Color(0.4, 0.4, 0.4, 1)
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("2_bg")
+expand_mode = 1
+
+[node name="BlurOverlay" type="ColorRect" parent="." unique_id=393108332]
+material = SubResource("ShaderMaterial_blur")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="StageButtonContainer" type="HBoxContainer" parent="." unique_id=494463316]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -410.0
+offset_top = -70.0
+offset_right = 410.0
+offset_bottom = 70.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 80
+
+[node name="Stage1Button" type="Button" parent="StageButtonContainer" unique_id=1008022850]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(220, 140)
+layout_mode = 2
+theme_override_font_sizes/font_size = 28
+text = "Stage 1"
+
+[node name="Stage2Button" type="Button" parent="StageButtonContainer" unique_id=1348213544]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(220, 140)
+layout_mode = 2
+theme_override_font_sizes/font_size = 28
+text = "Stage 2"
+
+[node name="Stage3Button" type="Button" parent="StageButtonContainer" unique_id=2112354416]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(220, 140)
+layout_mode = 2
+theme_override_font_sizes/font_size = 28
+text = "Stage 3"

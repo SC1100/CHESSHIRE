@@ -4,6 +4,41 @@ Git 커밋 로그만으로는 파악하기 힘든 기획 의도, 구조적 판�
 
 ---
 
+## 260830 - CHESSHIRE 타이틀 씬(TitleScene) UI & 스테이지 선택 씬(Stage.tscn) 구축 및 Stage 1 연동
+*   **작업 내용**:
+    *   **타이틀 UI 레이아웃 구축**: `Scene/TitleScene.tscn`에 화면 좌측 상단 게임 제목(`CHESSHIRE`) 및 좌측 중앙 메뉴 버튼 모음(`VBoxContainer`) 구성. 프로젝트 시작 씬(`run/main_scene`)을 `TitleScene.tscn`으로 지정.
+    *   **버튼 배치 및 스크립트 분리**: `New Game`, `Continue`, `Option`, `Quit` 4개 버튼 배치 및 `scripts/ui/TitleManager.gd`로 컨트롤 연결. `New Game` 클릭 시 `Scene/Stage.tscn`으로 씬 전환 연결.
+    *   **스테이지 선택 씬(`Scene/Stage.tscn`) 구성 및 Stage 1 데이터 연동**:
+        *   **어둡고 블러 처리된 배경**: 타이틀 이미지(`ChesshireTitle.png`)의 밝기를 낮추고(`Color(0.4, 0.4, 0.4, 1)`), 캔버스 셰이더(`hint_screen_texture`)를 기반으로 은은한 화면 블러(Blur) 효과 적용.
+        *   **스테이지 가로 배치 버튼**: 화면 정중앙(`HBoxContainer`)에 큼직한 `Stage 1`, `Stage 2`, `Stage 3` 버튼 가로 배열 (간격 80px).
+        *   **Stage 1 게임 연동**: `stages.json`에 상대방 퀸/비숍/룩 및 특정 폰이 제거된 커스텀 `stage1` 데이터 정의. `Stage 1` 버튼 클릭 시 `BoardManager.current_stage_id = "stage1"` 설정 후 `Battle_Scene.tscn`으로 씬 진입되도록 완성.
+    *   **승리 목표 용어 리팩토링 (`VIP_Target` ➔ `Objective`)**:
+        *   이동 대상 타일(`target_tile`)과의 명칭 혼선을 막기 위해 체스 킹 등 승리 목표 기물의 식별 태그 및 그룹명을 `VIP_Target`에서 `Objective`로 전면 변경 (`CardData.gd`, `CardManager.gd`, `AITestRunner.gd`).
+    *   **AI 점수 평가 하한선 보완 (`highest_score = -INF`)**:
+        *   CHESSHIRE 특성상 체크메이트(외통수) 상태여도 해당 카드가 드로우되지 않으면 물리적으로 잡을 수 없으므로, 코너에 몰려 감점이 극심한 상황에서도 AI가 턴을 포기/스킵하지 않고 끝까지 최선의 이동을 수행하도록 평가 하한선을 `-INF`로 수정.
+    *   **실행 파일 동등 디렉토리 프로필 세이브 시스템 (`ProfileManager.gd`)**:
+        *   에디터 및 배포된 `.exe` 실행 파일 위치의 `profile/` 디렉토리에 닉네임 기반 JSON 세이브파일(`player.json`)이 자동 생성 및 동기화되도록 구현.
+        *   `permanent_data`(영구 해금)와 `current_run`(단기 런 마스터 덱)을 이원화 관리하도록 설계 및 `DeckComponent` / `CardManager` 연동 완료.
+    *   **Stage 2 데이터 작성 및 버튼 연동**:
+        *   `resources/data/stages.json`에 풀 정규 체스 기물 배치인 `stage2` 데이터 추가.
+        *   `Stage.tscn`의 `Stage 2` 버튼 클릭 시 `BoardManager.current_stage_id = "stage2"` 설정 후 배틀 씬으로 진입하도록 `StageManager.gd` 연동.
+    *   **승리("VICTORY!") & 패배("DEFEATED") 연출 및 보상 UI (`RewardUI.gd`) 구축**:
+        *   `BoardManager.gd`에서 상대 `Objective` 포획 시 중앙 대형 황금빛 "VICTORY!" 서체 확대 연출 ➔ `ProfileManager` 해금 카드 기반 보상/정제 UI 팝업.
+        *   아군 `Objective` 포획 시 중앙 대형 핏빛 "DEFEATED" 서체 확대 연출 ➔ 2초 후 패배 처리 및 스테이지 선택 재시도 오버레이 제공.
+        *   `CenterContainer` 레이아웃 구조로 전면 개편하여 승리/패배/보상/카드삭제 등 모든 연출 및 팝업 UI가 어떠한 해상도에서도 화면 정중앙에 100% 정밀하게 배치되도록 보강.
+        *   **덱 정제 UI 미니멀화 & 직행 다음 스테이지 진입 연동**:
+            *   카드 삭제 팝업 시 텍스트/코스트/설명 라벨을 전부 배제하고, 깔끔하게 **Pure 카드 일러스트 이미지**만 가로 5개씩(`GridContainer(columns=5)`) 줄바꿈 정렬되는 미니멀 그리드 비주얼 스타일로 수정 (카드 클릭 시 즉시 덱에서 삭제).
+            *   "다음 스테이지로 ➔" 클릭 시 스테이지 선택 씬을 거치지 않고 `Stage 1` ➔ `Stage 2`로 즉시 직행 진입하도록 `BoardManager.current_stage_id` 업데이트 및 배틀 씬 재로드 연결.
+*   **핵심 의도 및 대화 요약**:
+    *   메인 타이틀 -> 스테이지 선택 -> 커스텀 스테이지 진입 흐름 및 승리("VICTORY!") / 패배("DEFEATED") 연출, 해금 데이터 기반 보상 획득/카드 정제 UI(`RewardUI.gd`)까지 완성하여 로그라이크 덱빌딩 코어 루프를 성공적으로 구축함.
+
+## 260821 - 플레이어 진영(Player Team) 기반 기물 제어 및 카드 행동권 격리
+*   **작업 내용**:
+    *   **진영 감지 로직**: `Piece.gd`에 `get_team()` 헬퍼 추가, `BoardManager.gd`에 `@export var player_team: PieceData.Team` 및 `is_player_piece()` 구현.
+    *   **아군 기물 제약 및 AI 동적 인식**: `BoardInput.gd`에서 아군 기물만 클릭 가능하도록 차단하고, `AITestRunner.gd`가 플레이어 진영을 자동으로 피하여 적군 기물만 제어하도록 연동.
+*   **핵심 의도**:
+    *   플레이어가 백색/흑색 어느 진영을 플레이하더라도 코드 수정 없이 변수 하나로 완벽하게 자신의 기물 및 카드가 동작하도록 흑/백 역할 자동 전환 구조 구축.
+
 ## 260718 - 턴 시스템 자동화 및 다중 행동 AI 도입
 *   **작업 내용**:
     *   **기물 카드(Piece Cards) 시스템 연동**: 체스 기물들을 조작하기 위한 전용 카드 에셋들을 DB(`CardData.gd`)에 정식 편입하고, 턴당 다중 행동 규칙에 맞추어 카드 코스트 밸런스를 전체적으로 재조정함.

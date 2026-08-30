@@ -22,6 +22,7 @@ var piece_scenes = {
 }
 
 # 2. 스테이지 데이터 (이제 JSON에서 불러옵니다)
+static var current_stage_id: String = "test_stage"
 var stages: Dictionary = {}
 
 var board_grid: Node3D
@@ -98,9 +99,9 @@ func _ready():
 		
 	_load_stages_from_json()
 		
-	# 게임 시작 시 바로 test_stage 자동 배치 (테스트용)
+	# 설정된 current_stage_id 스테이지 자동 배치
 	# 콜리전 계산 등을 안전하게 처리하기 위해 프레임 끝에 호출(call_deferred)
-	call_deferred("load_stage", "test_stage")
+	call_deferred("load_stage", current_stage_id)
 
 func _load_stages_from_json():
 	var file_path = "res://resources/data/stages.json"
@@ -168,6 +169,12 @@ func load_stage(stage_id: String):
 		# 씬 트리에 추가 및 고유 이름 설정 (예: B_Pawn_1)
 		piece_instance.name = piece_key + "_" + str(piece_counts[piece_key])
 		add_child(piece_instance)
+		
+		# Piece 그룹 및 킹/승리 목표 기물에 Objective 그룹 자동 부여
+		piece_instance.add_to_group("Piece")
+		if "King" in piece_key or "Objective" in piece_key:
+			piece_instance.add_to_group("Objective")
+			print("BoardManager: '%s' 기물에 'Objective' 승리목표 그룹을 설정했습니다." % piece_instance.name)
 		
 		# 기물 스케일 축소 (원본 모델 크기가 거대하므로 체스 보드 비율에 맞춤)
 		piece_instance.scale = Vector3(0.0585, 0.0585, 0.0585)
@@ -243,9 +250,17 @@ func attempt_move(piece: Node, target_tile_name: String) -> bool:
 	if not target_tile_node: return false
 	
 	# 1. 적 기물 포획 처리
+	var is_victory_captured: bool = false
+	var is_defeat_captured: bool = false
 	if current_board_state.has(target_tile_name):
 		var target_piece = current_board_state[target_tile_name]
 		if is_instance_valid(target_piece) and target_piece != piece:
+			var is_obj = target_piece.is_in_group("Objective") or "King" in target_piece.name
+			if is_obj:
+				if not is_player_piece(target_piece):
+					is_victory_captured = true
+				else:
+					is_defeat_captured = true
 			target_piece.queue_free()
 			
 	# 2. 데이터 업데이트
@@ -264,4 +279,135 @@ func attempt_move(piece: Node, target_tile_name: String) -> bool:
 	var target_pos = target_tile_node.global_position
 	tween.tween_property(piece, "global_position", target_pos, 0.3)
 	
+	if is_victory_captured:
+		tween.finished.connect(trigger_victory)
+	elif is_defeat_captured:
+		tween.finished.connect(trigger_defeat)
+	
 	return true
+
+var is_game_over: bool = false
+
+func trigger_victory() -> void:
+	if is_game_over: return
+	is_game_over = true
+	print("★ [VICTORY] 상대 승리 목표(Objective)를 파괴하여 승리하였습니다! ★")
+	
+	var canvas = CanvasLayer.new()
+	canvas.layer = 90
+	add_child(canvas)
+	
+	var center = CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	canvas.add_child(center)
+	
+	var label = Label.new()
+	label.text = "VICTORY!"
+	label.add_theme_font_size_override("font_size", 110)
+	label.add_theme_color_override("font_color", Color(1.0, 0.85, 0.25))
+	label.add_theme_color_override("font_outline_color", Color(0.1, 0.05, 0.0))
+	label.add_theme_constant_override("outline_size", 20)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.scale = Vector2(0.2, 0.2)
+	label.modulate.a = 0.0
+	label.pivot_offset = Vector2(240, 70) # 110px 서체 대략적 텍스트 중앙 피벗
+	center.add_child(label)
+	
+	var tween = create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(label, "scale", Vector2(1.1, 1.1), 0.45).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tween.tween_property(label, "modulate:a", 1.0, 0.35)
+	
+	await get_tree().create_timer(1.8).timeout
+	
+	var tween_out = create_tween()
+	tween_out.tween_property(label, "modulate:a", 0.0, 0.4)
+	await tween_out.finished
+	canvas.queue_free()
+	
+	var reward_script = load("res://scripts/ui/RewardUI.gd")
+	if reward_script:
+		var reward_ui = reward_script.new()
+		add_child(reward_ui)
+
+func trigger_defeat() -> void:
+	if is_game_over: return
+	is_game_over = true
+	print("☠ [DEFEATED] 플레이어의 승리 목표(Objective)가 파괴되었습니다... ☠")
+	
+	var canvas = CanvasLayer.new()
+	canvas.layer = 90
+	add_child(canvas)
+	
+	var center = CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	canvas.add_child(center)
+	
+	var label = Label.new()
+	label.text = "DEFEATED"
+	label.add_theme_font_size_override("font_size", 110)
+	label.add_theme_color_override("font_color", Color(0.85, 0.15, 0.15))
+	label.add_theme_color_override("font_outline_color", Color(0.05, 0.0, 0.0))
+	label.add_theme_constant_override("outline_size", 20)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.scale = Vector2(0.2, 0.2)
+	label.modulate.a = 0.0
+	label.pivot_offset = Vector2(260, 70)
+	center.add_child(label)
+	
+	var tween = create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(label, "scale", Vector2(1.1, 1.1), 0.45).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tween.tween_property(label, "modulate:a", 1.0, 0.35)
+	
+	await get_tree().create_timer(2.0).timeout
+	
+	var tween_out = create_tween()
+	tween_out.tween_property(label, "modulate:a", 0.0, 0.4)
+	await tween_out.finished
+	canvas.queue_free()
+	
+	_show_defeat_ui()
+
+func _show_defeat_ui() -> void:
+	var canvas = CanvasLayer.new()
+	canvas.layer = 100
+	add_child(canvas)
+	
+	var bg = ColorRect.new()
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	bg.color = Color(0.08, 0.02, 0.02, 0.9)
+	canvas.add_child(bg)
+	
+	var center = CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	canvas.add_child(center)
+	
+	var vbox = VBoxContainer.new()
+	vbox.custom_minimum_size = Vector2(600, 300)
+	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	vbox.add_theme_constant_override("separation", 24)
+	center.add_child(vbox)
+	
+	var t_label = Label.new()
+	t_label.text = "DEFEATED..."
+	t_label.add_theme_font_size_override("font_size", 48)
+	t_label.add_theme_color_override("font_color", Color(0.9, 0.2, 0.2))
+	t_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(t_label)
+	
+	var sub_label = Label.new()
+	sub_label.text = "플레이어의 왕(Objective)이 파괴되었습니다."
+	sub_label.add_theme_font_size_override("font_size", 20)
+	sub_label.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8))
+	sub_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(sub_label)
+	
+	var retry_btn = Button.new()
+	retry_btn.text = "스테이지 선택으로 돌아가기"
+	retry_btn.custom_minimum_size = Vector2(250, 50)
+	retry_btn.add_theme_font_size_override("font_size", 18)
+	retry_btn.pressed.connect(func(): get_tree().change_scene_to_file("res://Scene/Stage.tscn"))
+	vbox.add_child(retry_btn)
