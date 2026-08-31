@@ -259,9 +259,11 @@ func _on_next_stage_pressed():
 	
 	if current_id == "stage1":
 		next_id = "stage2"
+	elif current_id == "stage2":
+		next_id = "stage3"
 	elif current_id == "test_stage":
 		next_id = "stage1"
-	elif current_id == "stage2":
+	elif current_id == "stage3":
 		# 모든 스테이지 완료 시 스테이지 선택 화면으로 복귀
 		print("RewardUI: 모든 스테이지를 클리어했습니다!")
 		get_tree().change_scene_to_file("res://Scene/Stage.tscn")

@@ -34,12 +34,12 @@ static var database: Dictionary = {}
 
 # 클래스가 처음 참조될 때 자동으로 실행되어 기물 카드를 DB에 등록합니다.
 static func _static_init():
-	_register("w_pawn", "White Pawn", 1, CardType.PIECE, "res://asset/Cards/W_Pawn.png", "전방으로 1칸 이동합니다. 첫 이동 시 2칸 이동 가능.", ["Piece", "Pawn"])
-	_register("w_knight", "White Knight", 1, CardType.PIECE, "res://asset/Cards/W_Knight.png", "L자 형태로 이동하며 다른 기물을 뛰어넘을 수 있습니다.", ["Piece", "Knight"])
-	_register("w_bishop", "White Bishop", 2, CardType.PIECE, "res://asset/Cards/W_Bishop.png", "대각선으로 원하는 만큼 이동합니다.", ["Piece", "Bishop"])
-	_register("w_rook", "White Rook", 2, CardType.PIECE, "res://asset/Cards/W_Rook.png", "가로 및 세로로 원하는 만큼 이동합니다.", ["Piece", "Rook"])
-	_register("w_queen", "White Queen", 2, CardType.PIECE, "res://asset/Cards/W_Queen.png", "상하좌우 및 대각선으로 원하는 만큼 이동합니다.", ["Piece", "Queen"])
-	_register("w_king", "White King", 1, CardType.PIECE, "res://asset/Cards/W_King.png", "모든 방향으로 1칸 이동합니다. 체스의 메인 타겟입니다.", ["Piece", "King", "Objective"])
+	_register("w_pawn", "White Pawn", 1, CardType.PIECE, "res://Asset/Cards/W_Pawn.png", "전방으로 1칸 이동합니다. 첫 이동 시 2칸 이동 가능.", ["Piece", "Pawn"])
+	_register("w_knight", "White Knight", 1, CardType.PIECE, "res://Asset/Cards/W_Knight.png", "L자 형태로 이동하며 다른 기물을 뛰어넘을 수 있습니다.", ["Piece", "Knight"])
+	_register("w_bishop", "White Bishop", 2, CardType.PIECE, "res://Asset/Cards/W_Bishop.png", "대각선으로 원하는 만큼 이동합니다.", ["Piece", "Bishop"])
+	_register("w_rook", "White Rook", 2, CardType.PIECE, "res://Asset/Cards/W_Rook.png", "가로 및 세로로 원하는 만큼 이동합니다.", ["Piece", "Rook"])
+	_register("w_queen", "White Queen", 2, CardType.PIECE, "res://Asset/Cards/W_Queen.png", "상하좌우 및 대각선으로 원하는 만큼 이동합니다.", ["Piece", "Queen"])
+	_register("w_king", "White King", 1, CardType.PIECE, "res://Asset/Cards/W_King.png", "모든 방향으로 1칸 이동합니다. 체스의 메인 타겟입니다.", ["Piece", "King", "Objective"])
 
 static func _register(_id: String, _name: String, _cost: int, _type: CardType, _image_path: String, _desc: String, _tags: Array[String] = []):
 	database[_id] = CardData.new(_id, _name, _cost, _type, _image_path, _desc, _tags)

@@ -40,6 +40,7 @@ func _ready():
 	
 	var sv_container = SubViewportContainer.new()
 	sv_container.set_anchors_preset(Control.PRESET_FULL_RECT)
+	sv_container.stretch = true # [핵심] 창 크기 변경 시 캔버스 스케일에 맞춰 자동 비례 확대/축소
 	# MOUSE_FILTER_PASS로 설정하여 빈 공간 클릭 시 뒤의 체스판(unhandled_input)으로 클릭이 넘어가게 함
 	sv_container.mouse_filter = Control.MOUSE_FILTER_PASS
 	canvas_layer.add_child(sv_container)
@@ -47,13 +48,10 @@ func _ready():
 	sub_viewport = SubViewport.new()
 	sub_viewport.transparent_bg = true # 뒷 배경 투명화 (핵심)
 	sub_viewport.own_world_3d = true # [핵심] 체스 씬의 하늘(WorldEnvironment)과 렌더링 분리
-	sub_viewport.size = get_viewport().size
+	sub_viewport.size = Vector2i(1600, 900) # [핵심] 1600x900 기준 해상도 고정으로 3D 카드 시야각/위치 100% 동기화
 	sub_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 	sub_viewport.physics_object_picking = true # 3D 카드 레이캐스트 감지를 위해 필수
 	sv_container.add_child(sub_viewport)
-	
-	# 창 크기 변경 시 서브뷰포트 크기 동기화
-	get_viewport().size_changed.connect(_on_viewport_size_changed)
 	
 	# 3. 카드 테스트 씬 로드 및 서브뷰포트에 넣기
 	var card_scene = load(card_scene_path).instantiate()
@@ -97,16 +95,13 @@ func _setup_fade_in_transition() -> void:
 	await tween.finished
 	fade_layer.queue_free()
 
-func _on_viewport_size_changed():
-	if is_instance_valid(sub_viewport):
-		sub_viewport.size = get_viewport().size
-
 func _setup_token_ui(canvas: CanvasLayer):
 	token_label = Label.new()
-	# 화면 우측 상단쯤 배치 (필요에 따라 조절)
-	token_label.position = Vector2(1600, 50)
-	token_label.add_theme_font_size_override("font_size", 28)
-	token_label.add_theme_color_override("font_color", Color(1.0, 0.9, 0.2)) # 잘 보이도록 노란색
+	token_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	token_label.position = Vector2(1240, 100) # 현재 위치 라벨(Y=40) 아래로 배치
+	token_label.custom_minimum_size = Vector2(320, 0)
+	token_label.add_theme_font_size_override("font_size", 24)
+	token_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0)) # 뚜렷한 흰색
 	token_label.add_theme_color_override("font_outline_color", Color(0, 0, 0))
 	token_label.add_theme_constant_override("outline_size", 8)
 	canvas.add_child(token_label)
@@ -115,7 +110,7 @@ func _process(_delta: float):
 	# 매 프레임마다 토큰(행동권) 현황을 가져와서 UI 갱신
 	var bm = get_tree().get_first_node_in_group("BoardManager")
 	if bm and token_label:
-		var text = "== [ 기물 행동권 ] ==\n"
+		var text = " 행동가능 기물 \n"
 		for piece in bm.active_tokens.keys():
 			if bm.active_tokens[piece] > 0:
 				text += "%s : %d\n" % [piece, bm.active_tokens[piece]]
