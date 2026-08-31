@@ -17,7 +17,7 @@ func _init(_data: CardData):
 	# 1. 3D 메쉬(외형) 생성 - 앞면
 	mesh_instance = MeshInstance3D.new()
 	var quad = QuadMesh.new()
-	quad.size = Vector2(1.0, 1.36) # 카드의 3D 비율 (약 1:1.36)
+	quad.size = Vector2(1.0, 1.5) # 카드의 3D 비율 (정확한 2:3 비율 / 800x1200 에셋 동기화)
 	mesh_instance.mesh = quad
 	
 	# 매테리얼 설정

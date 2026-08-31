@@ -190,7 +190,7 @@ func _setup_deck_visual():
 	# 향후 덱 클릭(펼쳐보기)을 위한 충돌체 추가
 	var collision = CollisionShape3D.new()
 	var box = BoxShape3D.new()
-	box.size = Vector3(1.0, 1.36, 0.1)
+	box.size = Vector3(1.0, 1.5, 0.1)
 	collision.shape = box
 	deck_visual.add_child(collision)
 	deck_visual.collision_layer = 2 # 카드와 동일 레이어
@@ -198,7 +198,7 @@ func _setup_deck_visual():
 	# 카드 뒷면 메쉬 추가
 	deck_mesh = MeshInstance3D.new()
 	var quad = QuadMesh.new()
-	quad.size = Vector2(1.0, 1.36)
+	quad.size = Vector2(1.0, 1.5)
 	deck_mesh.mesh = quad
 	
 	var mat = StandardMaterial3D.new()
@@ -226,14 +226,14 @@ func _setup_discard_visual():
 	
 	var collision = CollisionShape3D.new()
 	var box = BoxShape3D.new()
-	box.size = Vector3(1.0, 1.36, 0.1)
+	box.size = Vector3(1.0, 1.5, 0.1)
 	collision.shape = box
 	discard_visual.add_child(collision)
 	discard_visual.collision_layer = 2
 	
 	discard_mesh = MeshInstance3D.new()
 	var quad = QuadMesh.new()
-	quad.size = Vector2(1.0, 1.36)
+	quad.size = Vector2(1.0, 1.5)
 	discard_mesh.mesh = quad
 	
 	var mat = StandardMaterial3D.new()
