@@ -72,6 +72,30 @@ func _ready():
 	
 	# 4. 행동권 현황 UI 생성 (기존 로그창을 덮지 않도록 우측 상단 배치)
 	_setup_token_ui(canvas_layer)
+	
+	# 5. 화면 진입 페이드인 암전 연출 (1~2프레임 3D 씬/카메라 로딩 잔상 가림)
+	_setup_fade_in_transition()
+
+func _setup_fade_in_transition() -> void:
+	var fade_layer = CanvasLayer.new()
+	fade_layer.layer = 100 # 최상단에 배치
+	add_child(fade_layer)
+	
+	var fade_rect = ColorRect.new()
+	fade_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
+	fade_rect.color = Color(0.0, 0.0, 0.0, 1.0) # 완전 암전
+	fade_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	fade_layer.add_child(fade_rect)
+	
+	# 2프레임 동안 암전 상태 유지하여 3D 씬/카메라 초기화 완성
+	await get_tree().process_frame
+	await get_tree().process_frame
+	
+	# 0.35초 동안 스무스하게 페이드인 (스테이지 페이드아웃 시간과 일치)
+	var tween = create_tween()
+	tween.tween_property(fade_rect, "color:a", 0.0, 0.35).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	await tween.finished
+	fade_layer.queue_free()
 
 func _on_viewport_size_changed():
 	if is_instance_valid(sub_viewport):
@@ -80,7 +104,7 @@ func _on_viewport_size_changed():
 func _setup_token_ui(canvas: CanvasLayer):
 	token_label = Label.new()
 	# 화면 우측 상단쯤 배치 (필요에 따라 조절)
-	token_label.position = Vector2(1600, 50) 
+	token_label.position = Vector2(1600, 50)
 	token_label.add_theme_font_size_override("font_size", 28)
 	token_label.add_theme_color_override("font_color", Color(1.0, 0.9, 0.2)) # 잘 보이도록 노란색
 	token_label.add_theme_color_override("font_outline_color", Color(0, 0, 0))

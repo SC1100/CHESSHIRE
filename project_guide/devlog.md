@@ -4,6 +4,32 @@ Git 커밋 로그만으로는 파악하기 힘든 기획 의도, 구조적 판�
 
 ---
 
+## 260831 - 이벤트 기반 사멸 기물 카드 중앙 클로즈업 & [기물 전멸] 3D 텍스트 페이드아웃 소멸(Exhaust) 구축
+*   **작업 내용**:
+    *   **이벤트 기반 기물 전멸 감지 최적화 (`BoardManager.gd`)**:
+        *   실시간 탐색 연산 비용을 제거하기 위해, 아군 기물이 포획(Capture)되는 순간에만 `_check_and_register_eliminated_piece_type(captured_piece)`를 호출.
+        *   잡힌 기물 종류의 동일 아군 기물이 체스판 위에 0개 남아있음을 확인 시, `eliminated_player_piece_tags` 소멸 플래그 목록에 등록.
+    *   **카메라 중앙 클로즈업 & 3D 텍스트 안내 페이드아웃 연출 (`CardManager.gd` & `CardVisual3D.gd`)**:
+        *   `CardVisual3D.gd`에 `set_card_alpha(alpha)` 헬퍼를 작성하여 카드 앞/뒷면 메쉬의 투명도를 일괄 제어 가능하도록 보강.
+        *   드로우 시 사멸된 기물 카드도 일단 정상적으로 손패 슬롯 위치로 날아와 착지.
+        *   착지 직후, 해당 사멸 카드가 **`CardManager` 씬 카메라 시점 정중앙(`to_global(Vector3(0, 0.8, 0.5))`)으로 클로즈업(`scale 0.5`)**하여 명확하게 카드를 노출.
+        *   카드 전면에 **하얀색 글씨 + 뚜렷한 검은색 테두리 외곽선**의 3D 텍스트 안내(`Label3D`: `[ PAWN ] 기물 전멸!`) 팝업 (**0.8초간 대기**하여 소멸 원인을 충분히 판독).
+        *   대기 후 **3D 카드와 전멸 안내 텍스트가 동시에 투명해지며 페이드 아웃(0.5초 Fade-Out)**하여 완전 소멸 (`queue_free()`).
+        *   소멸 완료 후 남아있는 손패 카드들이 부드럽게 중앙으로 자동 재배치 (`_recalculate_hand_positions()`).
+    *   **비동기 사전로딩 & 루트 레이어 기반 심리스 씬 전환 (`StageManager.gd`)**:
+        *   `add_child(fade_layer)` 대신 **`get_tree().root.add_child(fade_layer)`**를 적용하여, `change_scene_to_packed` 시 씬이 파괴되는 순간에도 검은 페이드 레이어가 화면 최상단(Window Root)에 파괴되지 않고 100% 지속 유지되도록 보강.
+        *   `change_scene_to_packed` 호출 후 `StageManager`가 트리에서 이탈할 때 발생하던 `get_tree() -> null` 오류를 막기 위해, 미리 확보한 `fade_layer.get_tree()`의 참조를 사용해 1프레임 후 오버레이가 안전하게 cleanup 되도록 예외 처리 완료.
+        *   스테이지 버튼 클릭 즉시 비동기 로딩(`ResourceLoader.load_threaded_request`) 가동 ➔ 검은 화면 스무스 페이드아웃(0.35s) ➔ 100% 암전 속 씬 전환 ➔ 배틀 씬 스무스 페이드인(0.35s)으로 대칭 연동되어 **회색 화면 깜빡임이 0.001초도 보이지 않는 완벽한 씬 전환** 완성.
+    *   **캐슬링 (Castling) 규칙 및 3D 동시 이동 구현 (`ChessRules.gd` & `BoardManager.gd`)**:
+        *   `ChessRules.gd` 킹 규칙에 캐슬링 조건 추가: 킹과 대상 룩의 미이동(`move_count == 0`) 및 경로 빈 공간 판별.
+        *   `BoardManager.gd`에서 킹 2칸 이동 시 킹과 룩이 동시에 3D 슬라이드(Tween)하며 보드 딕셔너리(`current_board_state`)를 갱신하도록 구현.
+    *   **동적 폰 프로모션 (Pawn Promotion) & 카드 덱 연동 (`PromotionUI.gd` & `BoardManager.gd`)**:
+        *   `Grid.current_grid_info.get("max_row", 8)`를 활용하여 가변 체스판에서도 최후열 행 도달(백: `max_row`, 흑: `1`) 시 승급을 감지하는 동적 로직 구성.
+        *   플레이어 폰 승급 시 카드 소멸 연출 시퀀스 양식과 일치시킨 **`[ PROMOTION ]` 헤더** 및 **4장의 기물 카드(퀸, 룩, 비숍, 나이트 일러스트/호버 micro-animation, 설명 텍스트 제외하여 시각적으로 군더더기 없이 깔끔하게 조율)** 선택 UI(`PromotionUI.gd`)로 개편 (AI 흑 폰은 자동 퀸 승급).
+        *   승급 시 기존 폰 파괴 후 승급 기물 3D 모델을 스냅 배치하며(기존 폰의 `get_parent()` 부모 계층 및 `pawn.scale`을 완벽히 상속받아 **크기가 비대해지는 현상 방지 및 체스판 비율 100% 동기화**), 승급한 기물의 **전멸/사멸 플래그(`eliminated_player_piece_tags`)를 자동 해제**하고 **해당 기물 카드 1장(`w_queen`, `w_rook` 등)을 버린 덱이 아닌 플레이어의 손패로 즉시 추가(`add_card_directly_to_hand`)**하여 드로우 애니메이션과 함께 바로 사용할 수 있도록 완성.
+*   **핵심 의도 및 대화 요약**:
+    *   기물 전멸 시 포획 연출과 심리스 씬 전환 및 Stage 3 추가를 완성함. 나아가 체스 표준 캐슬링(킹/룩 동시 이동)과 동적 보드 응용 폰 프로모션(카드 나열 UI 팝업, 기물 전멸 플래그 복구, 승급 기물 카드 손패 직접 추가) 시스템을 성공적으로 구축함.
+
 ## 260830 - CHESSHIRE 타이틀 씬(TitleScene) UI & 스테이지 선택 씬(Stage.tscn) 구축 및 Stage 1 연동
 *   **작업 내용**:
     *   **타이틀 UI 레이아웃 구축**: `Scene/TitleScene.tscn`에 화면 좌측 상단 게임 제목(`CHESSHIRE`) 및 좌측 중앙 메뉴 버튼 모음(`VBoxContainer`) 구성. 프로젝트 시작 씬(`run/main_scene`)을 `TitleScene.tscn`으로 지정.
@@ -26,9 +52,6 @@ Git 커밋 로그만으로는 파악하기 힘든 기획 의도, 구조적 판�
         *   `BoardManager.gd`에서 상대 `Objective` 포획 시 중앙 대형 황금빛 "VICTORY!" 서체 확대 연출 ➔ `ProfileManager` 해금 카드 기반 보상/정제 UI 팝업.
         *   아군 `Objective` 포획 시 중앙 대형 핏빛 "DEFEATED" 서체 확대 연출 ➔ 2초 후 패배 처리 및 스테이지 선택 재시도 오버레이 제공.
         *   `CenterContainer` 레이아웃 구조로 전면 개편하여 승리/패배/보상/카드삭제 등 모든 연출 및 팝업 UI가 어떠한 해상도에서도 화면 정중앙에 100% 정밀하게 배치되도록 보강.
-        *   **덱 정제 UI 미니멀화 & 직행 다음 스테이지 진입 연동**:
-            *   카드 삭제 팝업 시 텍스트/코스트/설명 라벨을 전부 배제하고, 깔끔하게 **Pure 카드 일러스트 이미지**만 가로 5개씩(`GridContainer(columns=5)`) 줄바꿈 정렬되는 미니멀 그리드 비주얼 스타일로 수정 (카드 클릭 시 즉시 덱에서 삭제).
-            *   "다음 스테이지로 ➔" 클릭 시 스테이지 선택 씬을 거치지 않고 `Stage 1` ➔ `Stage 2`로 즉시 직행 진입하도록 `BoardManager.current_stage_id` 업데이트 및 배틀 씬 재로드 연결.
 *   **핵심 의도 및 대화 요약**:
     *   메인 타이틀 -> 스테이지 선택 -> 커스텀 스테이지 진입 흐름 및 승리("VICTORY!") / 패배("DEFEATED") 연출, 해금 데이터 기반 보상 획득/카드 정제 UI(`RewardUI.gd`)까지 완성하여 로그라이크 덱빌딩 코어 루프를 성공적으로 구축함.
 

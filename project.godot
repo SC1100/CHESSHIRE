@@ -33,3 +33,4 @@ window/size/viewport_height=900
 [rendering]
 
 rendering_device/driver.windows="d3d12"
+environment/defaults/default_clear_color=Color(0.22670749, 0.22670749, 0.22670746, 1)

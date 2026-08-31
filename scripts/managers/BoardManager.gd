@@ -47,6 +47,33 @@ func is_player_piece(piece: Node) -> bool:
 	else:
 		return piece.name.begins_with("B_")
 
+# 아군 기물 전멸 태그 등록 목록 및 검사 함수
+var eliminated_player_piece_tags: Array[String] = []
+
+func _check_and_register_eliminated_piece_type(captured_piece: Node) -> void:
+	if not is_instance_valid(captured_piece): return
+	var p_type = ""
+	for tag in ["Pawn", "Knight", "Bishop", "Rook", "Queen", "King"]:
+		if tag.to_lower() in captured_piece.name.to_lower():
+			p_type = tag
+			break
+			
+	if p_type == "": return
+	
+	# 체스판 위 다른 아군 기물 중 동일 기물 종류가 남아있는지 검사 (captured_piece 제외)
+	var is_still_alive = false
+	for tile_name in current_board_state:
+		var board_p = current_board_state[tile_name]
+		if is_instance_valid(board_p) and board_p != captured_piece and is_player_piece(board_p):
+			if p_type.to_lower() in board_p.name.to_lower():
+				is_still_alive = true
+				break
+				
+	if not is_still_alive:
+		if not eliminated_player_piece_tags.has(p_type):
+			eliminated_player_piece_tags.append(p_type)
+			print("BoardManager: 플레이어의 '%s' 기물이 전멸했습니다! 소멸 플래그 목록에 등록됨." % p_type)
+
 # --- Action Tokens ---
 var active_tokens: Dictionary = {
 	"Pawn": 0, "Knight": 0, "Bishop": 0, "Rook": 0, "Queen": 0, "King": 0
@@ -261,6 +288,11 @@ func attempt_move(piece: Node, target_tile_name: String) -> bool:
 					is_victory_captured = true
 				else:
 					is_defeat_captured = true
+			
+			# 아군 기물이 잡힌 경우 전멸 상태 검사 및 등록
+			if is_player_piece(target_piece):
+				_check_and_register_eliminated_piece_type(target_piece)
+
 			target_piece.queue_free()
 			
 	# 2. 데이터 업데이트
@@ -270,8 +302,44 @@ func attempt_move(piece: Node, target_tile_name: String) -> bool:
 	# 이동 시 하이라이트 지우기
 	clear_valid_moves()
 	
-	# 3. Tween 부드러운 애니메이션
+	# 캐슬링 판별 (킹이 2칸 이동 시)
+	var is_castling: bool = false
+	var rook_to_move: Node = null
+	var rook_target_tile_name: String = ""
+	
+	if "King" in piece.name:
+		var start_grid = ChessRules.get_grid_pos(start_tile)
+		var target_grid = ChessRules.get_grid_pos(target_tile_name)
+		var dx = target_grid.x - start_grid.x
+		if abs(dx) == 2:
+			is_castling = true
+			var is_kingside = (dx == 2)
+			var row_str = start_tile.substr(1)
+			var rook_start_tile = ("h" if is_kingside else "a") + row_str
+			rook_target_tile_name = ("f" if is_kingside else "d") + row_str
+			rook_to_move = current_board_state.get(rook_start_tile)
+			if is_instance_valid(rook_to_move):
+				current_board_state.erase(rook_start_tile)
+				current_board_state[rook_target_tile_name] = rook_to_move
+				if rook_to_move.has_method("record_move"):
+					rook_to_move.record_move()
+
+	# 기물 이동 횟수 기록
+	if piece.has_method("record_move"):
+		piece.record_move()
+
+	# 폰 프로모션 판별
+	var is_promotion: bool = false
+	if "Pawn" in piece.name:
+		var target_row = int(target_tile_name.substr(1))
+		var max_row = Grid.current_grid_info.get("max_row", 8)
+		var is_white = piece.name.begins_with("W_")
+		if (is_white and target_row == max_row) or (not is_white and target_row == 1):
+			is_promotion = true
+	
+	# 3. Tween 부드러운 애니메이션 (병렬 실행)
 	var tween = create_tween()
+	tween.set_parallel(true)
 	tween.set_trans(Tween.TRANS_SINE)
 	tween.set_ease(Tween.EASE_IN_OUT)
 	
@@ -279,19 +347,100 @@ func attempt_move(piece: Node, target_tile_name: String) -> bool:
 	var target_pos = target_tile_node.global_position
 	tween.tween_property(piece, "global_position", target_pos, 0.3)
 	
+	if is_castling and is_instance_valid(rook_to_move):
+		var rook_target_tile_node = board_grid.get_node_or_null(rook_target_tile_name)
+		if rook_target_tile_node:
+			tween.tween_property(rook_to_move, "global_position", rook_target_tile_node.global_position, 0.3)
+	
 	if is_victory_captured:
 		tween.finished.connect(trigger_victory)
 	elif is_defeat_captured:
 		tween.finished.connect(trigger_defeat)
+	elif is_promotion:
+		tween.finished.connect(func(): _handle_pawn_promotion(piece, target_tile_name))
 	
 	return true
+
+func _handle_pawn_promotion(pawn_piece: Node, target_tile_name: String) -> void:
+	if not is_instance_valid(pawn_piece): return
+	
+	var is_white = pawn_piece.name.begins_with("W_")
+	
+	if is_white:
+		# 플레이어 백 폰 승급: PromotionUI 팝업
+		var promo_ui = PromotionUI.new()
+		add_child(promo_ui)
+		promo_ui.promotion_selected.connect(func(chosen_piece_type: String):
+			_execute_promotion(pawn_piece, target_tile_name, is_white, chosen_piece_type)
+		)
+	else:
+		# AI 흑 폰 승급: 자동 퀸(Queen) 승급
+		_execute_promotion(pawn_piece, target_tile_name, is_white, "Queen")
+
+func _execute_promotion(pawn_piece: Node, target_tile_name: String, is_white: bool, piece_type: String) -> void:
+	if not is_instance_valid(pawn_piece): return
+	
+	var tile_node = board_grid.get_node_or_null(target_tile_name)
+	if not tile_node: return
+	
+	var prefix = "W_" if is_white else "B_"
+	var piece_key = prefix + piece_type # 예: "W_Queen"
+	
+	if not piece_scenes.has(piece_key):
+		push_error("BoardManager: 승급할 기물 씬 키가 없습니다 - %s" % piece_key)
+		return
+		
+	var parent_node = pawn_piece.get_parent() if is_instance_valid(pawn_piece.get_parent()) else self
+	var pawn_scale = pawn_piece.scale
+	
+	# 1. 새 3D 기물 노드 생성 및 설정
+	var new_piece = piece_scenes[piece_key].instantiate()
+	
+	# Piece.gd 스크립트가 없다면 강제로 부착
+	var piece_script = preload("res://scripts/Piece.gd")
+	if new_piece.get_script() != piece_script:
+		new_piece.set_script(piece_script)
+		new_piece.set("move_count", 1)
+		new_piece.set("max_moves", 1)
+		
+	new_piece.name = piece_key + "_" + str(randi() % 10000)
+	parent_node.add_child(new_piece)
+	
+	new_piece.add_to_group("Piece")
+	if "King" in piece_key or "Objective" in piece_key:
+		new_piece.add_to_group("Objective")
+		
+	new_piece.scale = pawn_scale
+	new_piece.global_position = tile_node.global_position
+	
+	# 2. 보드 상태 갱신 및 기존 폰 파괴
+	current_board_state[target_tile_name] = new_piece
+	pawn_piece.queue_free()
+	
+	print("★ [PROMOTION] %s 폰이 %s(으)로 승급되었습니다! ★" % [prefix, piece_type])
+	
+	# 3. 플레이어 기물 승급 시 사멸 플래그 해제 및 전투 덱에 카드 1장 추가
+	if is_white:
+		# (1) 사멸/전멸 플래그 목록에서 해당 승급 기물 태그 제거
+		if eliminated_player_piece_tags.has(piece_type):
+			eliminated_player_piece_tags.erase(piece_type)
+			print("BoardManager: 승급으로 인해 '%s' 전멸 플래그가 해제되었습니다!" % piece_type)
+			
+		# (2) 승급한 기물 카드 1장을 플레이어의 손패로 즉시 추가 (드로우 연출가동)
+		var card_id = "w_" + piece_type.to_lower() # 예: "w_queen"
+		var card_managers = get_tree().get_nodes_in_group("CardManager")
+		if card_managers.size() > 0:
+			var card_manager = card_managers[0]
+			if card_manager.has_method("add_card_directly_to_hand"):
+				card_manager.add_card_directly_to_hand(card_id)
+				print("BoardManager: 승급한 기물 카드('%s') 1장이 플레이어 손패로 즉시 추가되었습니다!" % card_id)
 
 var is_game_over: bool = false
 
 func trigger_victory() -> void:
 	if is_game_over: return
 	is_game_over = true
-	print("★ [VICTORY] 상대 승리 목표(Objective)를 파괴하여 승리하였습니다! ★")
+	print("★ [VICTORY] 승리하였습니다! ★")
 	
 	var canvas = CanvasLayer.new()
 	canvas.layer = 90
@@ -334,7 +483,7 @@ func trigger_victory() -> void:
 func trigger_defeat() -> void:
 	if is_game_over: return
 	is_game_over = true
-	print("☠ [DEFEATED] 플레이어의 승리 목표(Objective)가 파괴되었습니다... ☠")
+	print("☠ [DEFEATED] 패배하였습니다... ☠")
 	
 	var canvas = CanvasLayer.new()
 	canvas.layer = 90

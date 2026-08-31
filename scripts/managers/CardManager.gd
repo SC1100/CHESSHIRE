@@ -3,6 +3,14 @@ class_name CardManager
 
 @export var main_camera: Camera3D
 
+@export_group("Exhaust Animation Settings")
+@export var exhaust_card_offset: Vector3 = Vector3(0.0, 2.0, 0.5) ## 사멸 카드 중앙 위치 (X: 좌우, Y: 높이, Z: 앞뒤 깊이)
+@export var exhaust_card_scale: Vector3 = Vector3(1.1, 1.1, 1.1) ## 사멸 카드 확대 크기 배율 (X, Y, Z)
+@export var exhaust_text_offset: Vector3 = Vector3(0.0, 0.4, 0.1) ## 전멸 안내 텍스트 상대 위치 (X: 좌우, Y: 높이, Z: 앞뒤)
+@export var exhaust_text_font_size: int = 48 ## 전멸 안내 텍스트 폰트 크기
+@export var exhaust_display_time: float = 0.8 ## 안내 텍스트 정지 노출 시간 (초)
+@export var exhaust_fade_time: float = 0.5 ## 페이드아웃 투명화 연출 시간 (초)
+
 var hand: Array[CardData] = []
 var card_visuals: Array[CardVisual3D] = []
 
@@ -69,11 +77,15 @@ func _ready():
 		master_deck = p_data.deck_card_ids
 	deck_component.initialize_from_deck_list(master_deck)
 			
-	# 게임 시작 시 첫 턴 강제 시작
-	start_turn()
+	# 게임 시작 시 첫 턴은 화면 페이드인 암전 연출 후 드로우 되도록 대기 후 시작
+	_start_initial_turn_with_delay()
 	
 	# 좌측 상단 테스트용 드로우 버튼 생성
 	_setup_test_ui()
+
+func _start_initial_turn_with_delay() -> void:
+	await get_tree().create_timer(0.5).timeout
+	start_turn()
 
 func _setup_test_ui():
 	# 3D 환경에서도 화면(카메라) 렌즈 앞에 UI를 딱 붙이기 위해 CanvasLayer를 사용합니다.
@@ -266,7 +278,10 @@ func execute_drawing(amount: int):
 		
 	current_state = State.DRAWING # 상태를 DRAWING으로 변경 (모든 입력 차단)
 	
+	var bm = get_tree().get_first_node_in_group("BoardManager")
 	var drawn_cards = []
+	var exhaust_items = [] # 손패 착직 후 소멸시킬 카드의 정보 수집 리스트
+	
 	for i in range(amount):
 		var drawn_id = deck_component.draw_card()
 		if drawn_id != "":
@@ -283,19 +298,90 @@ func execute_drawing(amount: int):
 				card_3d.set_process(false)
 				drawn_cards.append(card_3d)
 				
+				# 전멸된 기물 태그 감지
+				var piece_tag = ""
+				for tag in data.tags:
+					if tag != "Piece" and tag != "Objective":
+						piece_tag = tag
+						break
+				
+				if bm and piece_tag != "" and "eliminated_player_piece_tags" in bm:
+					if bm.eliminated_player_piece_tags.has(piece_tag):
+						exhaust_items.append({"visual": card_3d, "data": data, "tag": piece_tag})
+				
 	if drawn_cards.size() > 0:
-		# 카드가 논리적으로 손패에 다 들어왔으므로 최종 목적지 한 번에 계산
+		# 1단계: 모든 드로우 카드가 정상적으로 손패 목표 위치로 날아오는 등장 애니메이션
 		_recalculate_hand_positions()
 		
-		# 0.15초 간격으로 시각적 등장 애니메이션 시작
 		for card_3d in drawn_cards:
 			_animate_drawn_card(card_3d)
 			await get_tree().create_timer(0.15).timeout
 			
-		# 마지막 카드의 트윈 연출(0.6초)이 완전히 끝날 때까지 여유롭게 대기
+		# 카드들이 손패 위치에 착지할 때까지 대기
 		await get_tree().create_timer(0.5).timeout
 		
+		# 2단계: 착지 후 전멸된 기물 카드가 있다면 손패 위치에서 위 공중으로 떠올라 소멸(Exhaust)
+		if exhaust_items.size() > 0:
+			for item in exhaust_items:
+				var c_visual: CardVisual3D = item["visual"]
+				var c_data: CardData = item["data"]
+				var p_tag: String = item["tag"]
+				
+				print("CardManager: 손패에 들어온 [%s] (%s) 카드가 손패 위 공중으로 들어올려져 소멸(Exhaust)됩니다." % [c_data.card_name, p_tag])
+				
+				# 논리적 데이터에서 제거
+				hand.erase(c_data)
+				card_visuals.erase(c_visual)
+				
+				# 손패 위 공중으로 올라가 소멸하는 연출 코루틴 수행
+				await _animate_exhaust_from_hand(c_visual, p_tag)
+				
+			# 소멸 후 남은 손패 카드들 재배치
+			_recalculate_hand_positions()
+			await get_tree().create_timer(0.3).timeout
+		
 	current_state = State.IDLE # 애니메이션이 모두 끝나면 상태를 IDLE로 복귀 (조작 가능)
+
+# 손패에 착지한 사멸 카드가 화면 중앙으로 클로즈업되어 [기물 전멸] 안내 후 텍스트와 함께 페이드 아웃 소멸(Exhaust)
+func _animate_exhaust_from_hand(card_3d: CardVisual3D, piece_tag: String):
+	if not is_instance_valid(card_3d): return
+	
+	card_3d.is_drawing = true # lerp 위치 추종 일시 중단
+	
+	# 1단계: 현재 손패 위치에서 CardManager 씬 카메라 정중앙 위치로 날아오며 클로즈업 확대 (0.35초)
+	var center_pos = to_global(exhaust_card_offset)
+	var tween1 = create_tween()
+	tween1.set_parallel(true)
+	tween1.tween_property(card_3d, "global_position", center_pos, 0.35).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tween1.tween_property(card_3d, "scale", exhaust_card_scale, 0.35).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tween1.tween_property(card_3d, "global_rotation", global_rotation, 0.35).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	
+	await tween1.finished
+	
+	# 2단계: 3D 전멸 안내 텍스트 생성 (하얀 글씨 + 검은색 테두리 외곽선)
+	var label = Label3D.new()
+	label.text = "[ %s ] 기물 전멸!" % piece_tag.to_upper()
+	label.font_size = exhaust_text_font_size
+	label.outline_size = 12
+	label.outline_modulate = Color(0.0, 0.0, 0.0, 1.0) # 뚜렷한 검은색 외곽선
+	label.modulate = Color(1.0, 1.0, 1.0, 1.0) # 하얀색 글씨
+	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	label.no_depth_test = true # 카드 전면에 시각적으로 뚜렷하게 보이도록 설정
+	add_child(label)
+	label.global_position = center_pos + exhaust_text_offset # 카드 대비 텍스트 상대 위치
+	
+	# 지정된 노출 시간 동안 대기하여 플레이어가 카드가 소멸하는 원인을 충분히 인지
+	await get_tree().create_timer(exhaust_display_time).timeout
+	
+	# 3단계: 카드와 전멸 안내 텍스트가 동시에 투명해지며 페이드 아웃
+	var tween2 = create_tween()
+	tween2.set_parallel(true)
+	tween2.tween_method(func(a: float): card_3d.set_card_alpha(a), 1.0, 0.0, exhaust_fade_time)
+	tween2.tween_property(label, "modulate:a", 0.0, exhaust_fade_time)
+	
+	await tween2.finished
+	label.queue_free()
+	card_3d.queue_free()
 
 # 드로우 시각 효과 처리 (위치 이동은 lerp가 전담, 여기서는 회전/크기만)
 func _animate_drawn_card(card_3d: CardVisual3D):
@@ -312,6 +398,25 @@ func _animate_drawn_card(card_3d: CardVisual3D):
 	var tween = create_tween().set_parallel(true)
 	tween.tween_property(card_3d, "global_rotation", card_3d.target_rotation, 0.6).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
 	tween.tween_property(card_3d, "scale", Vector3.ONE, 0.6).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
+
+# 프로모션 등 특수 상황 시 카드를 손패로 직접 추가하고 드로우 연출 실행
+func add_card_directly_to_hand(card_id: String) -> void:
+	var data = CardData.get_card(card_id)
+	if not data: return
+	
+	hand.append(data)
+	var card_3d = CardVisual3D.new(data)
+	add_child(card_3d)
+	card_visuals.append(card_3d)
+	
+	if is_instance_valid(deck_visual):
+		card_3d.global_position = deck_visual.global_position + (global_transform.basis.z * 0.1)
+	else:
+		card_3d.global_position = global_position
+		
+	_recalculate_hand_positions()
+	_animate_drawn_card(card_3d)
+	print("CardManager: 승급 카드 [%s]가 손패로 직접 추가되었습니다!" % data.card_name)
 
 func _recalculate_hand_positions():
 	var count = card_visuals.size()

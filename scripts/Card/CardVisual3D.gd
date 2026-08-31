@@ -76,3 +76,11 @@ func _process(delta: float):
 	var new_basis = Basis(current_quat.slerp(target_quat, 10.0 * delta))
 	# 회전 후 기존 글로벌 스케일을 다시 곱해줍니다.
 	global_transform.basis = new_basis.scaled(current_scale)
+
+# 카드 앞/뒷면 메쉬의 알파(투명도) 일괄 조정 헬퍼
+func set_card_alpha(alpha: float) -> void:
+	for child in get_children():
+		if child is MeshInstance3D and child.material_override:
+			var mat = child.material_override as StandardMaterial3D
+			if mat:
+				mat.albedo_color.a = clampf(alpha, 0.0, 1.0)

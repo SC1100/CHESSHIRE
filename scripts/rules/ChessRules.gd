@@ -98,8 +98,40 @@ static func is_move_valid(piece_name: String, start_tile: String, target_tile: S
 			return false
 
 		"King":
+			# 일반 이동 (모든 방향 1칸)
 			if abs_dx <= 1 and abs_dy <= 1:
 				return true
+				
+			# 캐슬링 이동 (가로 2칸 이동, 세로 이동 없음)
+			if abs_dy == 0 and (dx == 2 or dx == -2):
+				var king_piece = board_state.get(start_tile)
+				if not is_instance_valid(king_piece): return false
+				
+				# 1. 킹이 이번 게임에서 이동한 적이 없어야 함
+				if king_piece.get("move_count") != null and king_piece.move_count > 0:
+					return false
+					
+				var row_str = start_tile.substr(1) # "1" 또는 "8" 등
+				var is_kingside = (dx == 2)
+				var rook_col = "h" if is_kingside else "a"
+				var rook_tile = rook_col + row_str
+				
+				var rook_piece = board_state.get(rook_tile)
+				if not is_instance_valid(rook_piece): return false
+				
+				# 2. 룩이 이번 게임에서 이동한 적이 없어야 함
+				if rook_piece.get("move_count") != null and rook_piece.move_count > 0:
+					return false
+					
+				# 3. 킹과 룩 사이의 타일들이 모두 비어있어야 함
+				var between_cols = ["f", "g"] if is_kingside else ["b", "c", "d"]
+				for b_col in between_cols:
+					var b_tile = b_col + row_str
+					if board_state.has(b_tile) and is_instance_valid(board_state[b_tile]):
+						return false
+						
+				return true
+				
 			return false
 
 	# 등록되지 않은 기물이면 기본적으로 이동 불가
