@@ -39,14 +39,15 @@ static func load_data() -> PlayerData:
 	# 테스트용 기물 카드 덱 지급 (체스 기물 카드들)
 	# Godot 4의 엄격한 타입 검사(Array[String])를 통과하기 위해 assign()을 사용합니다.
 	new_data.deck_card_ids.assign([
-		"w_pawn",
-		"w_pawn",
-		"w_pawn",
+		"w_king",
+		"w_queen",
+		"w_rook",
 		"w_knight",
 		"w_bishop",
-		"w_rook",
-		"w_queen",
-		"w_king",
+		"w_pawn",
+		"w_pawn",
+		"w_pawn",
+		"t_two_cats",
 		"t_quick_decision"
 	])
 	return new_data

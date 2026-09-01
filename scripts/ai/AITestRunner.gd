@@ -63,7 +63,12 @@ func _on_enemy_turn():
 		if is_instance_valid(piece) and piece.has_method("reset_moves"):
 			piece.reset_moves()
 			
-	for action_idx in range(ai_actions_per_turn):
+	var current_max_actions = ai_actions_per_turn
+	if board_manager and "is_sabotaged" in board_manager and board_manager.is_sabotaged:
+		current_max_actions = 1
+		print("AITestRunner: [방해 공작] 디버프 적용으로 이번 AI 턴의 최대 행동 횟수가 1회로 제한됩니다.")
+			
+	for action_idx in range(current_max_actions):
 		# 모든 흑색 기물 찾기 (이번 턴에 아직 행동하지 않은 기물만)
 		var black_pieces = []
 		for tile in board_manager.current_board_state:
@@ -118,7 +123,7 @@ func _on_enemy_turn():
 		board_manager.current_valid_moves.append(best_tile) # Manager 내부 검증 통과용
 		board_manager.attempt_move(best_piece, best_tile)
 			
-		print("AI 결정 (%d/%d): %s ➔ %s (가치 점수: %d)" % [action_idx + 1, ai_actions_per_turn, best_piece.name, best_tile, round(highest_score)])
+		print("AI 결정 (%d/%d): %s ➔ %s (가치 점수: %d)" % [action_idx + 1, current_max_actions, best_piece.name, best_tile, round(highest_score)])
 		
 		# 다음 행동을 하기 전에 애니메이션 및 결사항전 연출을 볼 수 있도록 대기
 		await get_tree().create_timer(1.0).timeout
@@ -126,9 +131,12 @@ func _on_enemy_turn():
 	is_player_turn = true
 	print("AI 턴 종료. 플레이어의 턴입니다.")
 	
-	# 상대방 행동(AI 턴)이 모두 끝났으므로 남은 결사항전 함정 수량 리셋 후 플레이어 턴 시작
-	if board_manager and board_manager.has_method("reset_last_stand"):
-		board_manager.reset_last_stand()
+	# 상대방 행동(AI 턴)이 모두 끝났으므로 남은 결사항전 및 방해 공작 리셋 후 플레이어 턴 시작
+	if board_manager:
+		if board_manager.has_method("reset_last_stand"):
+			board_manager.reset_last_stand()
+		if board_manager.has_method("reset_sabotage"):
+			board_manager.reset_sabotage()
 		
 	var cm = get_tree().get_first_node_in_group("CardManager")
 	if cm and cm.has_method("start_turn"):

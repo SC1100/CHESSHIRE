@@ -47,7 +47,7 @@ func _build_ui():
 
 	# 서브 타이틀
 	var sub_label = Label.new()
-	sub_label.text = "해금된 보상 카드 3장 중 1장을 선택하여 덱을 강화하세요."
+	sub_label.text = "보상 카드 4장 중 1장을 선택하여 덱에 추가하세요."
 	sub_label.add_theme_font_size_override("font_size", 22)
 	sub_label.add_theme_color_override("font_color", Color(0.8, 0.85, 0.9))
 	sub_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -56,7 +56,7 @@ func _build_ui():
 	# 카드 선택 영역
 	card_options_container = HBoxContainer.new()
 	card_options_container.alignment = BoxContainer.ALIGNMENT_CENTER
-	card_options_container.add_theme_constant_override("separation", 30)
+	card_options_container.add_theme_constant_override("separation", 24)
 	main_container.add_child(card_options_container)
 
 	_generate_card_rewards()
@@ -95,65 +95,92 @@ func _generate_card_rewards():
 	if pm and pm.has_method("get_unlocked_cards"):
 		unlocked_pool = pm.get_unlocked_cards()
 	if unlocked_pool.is_empty():
-		unlocked_pool = ["w_pawn", "w_knight", "w_bishop", "w_rook", "w_queen"]
+		unlocked_pool = CardData.database.keys()
+	else:
+		# 보상 선택 폭 확장을 위해 CardData의 전체 카드 풀도 포함하여 셔플
+		for key in CardData.database.keys():
+			if not unlocked_pool.has(key):
+				unlocked_pool.append(key)
 
 	unlocked_pool.shuffle()
 	var selected_cards: Array[String] = []
-	for i in range(min(3, unlocked_pool.size())):
+	for i in range(min(4, unlocked_pool.size())):
 		selected_cards.append(unlocked_pool[i])
 
-	while selected_cards.size() < 3 and not unlocked_pool.is_empty():
-		selected_cards.append(unlocked_pool.pick_random())
+	while selected_cards.size() < 4 and not unlocked_pool.is_empty():
+		var pick = unlocked_pool.pick_random()
+		if not selected_cards.has(pick):
+			selected_cards.append(pick)
 
 	for card_id in selected_cards:
 		var card_panel = _create_reward_card_panel(card_id)
 		card_options_container.add_child(card_panel)
 
 func _create_reward_card_panel(card_id: String) -> Control:
-	var panel = PanelContainer.new()
-	panel.custom_minimum_size = Vector2(240, 340)
-
-	var vbox = VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 12)
-	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	panel.add_child(vbox)
+	var container = Control.new()
+	container.custom_minimum_size = Vector2(210, 310)
 
 	var data = CardData.database.get(card_id, null)
 	var card_name = data.card_name if data else card_id
-	var card_cost = data.cost if data else 1
-	var card_desc = data.description if data else ""
 
+	# 카드 기본 래퍼 버튼 (카드 전체 클릭 영역 및 호버 애니메이션 연동)
+	var card_btn = Button.new()
+	card_btn.custom_minimum_size = Vector2(210, 310)
+	card_btn.pivot_offset = Vector2(105, 155)
+
+	# 카드 프레임 고급 스타일 (골드/다크 룩앤필)
+	var style_normal = StyleBoxFlat.new()
+	style_normal.bg_color = Color(0.12, 0.14, 0.18, 0.95)
+	style_normal.set_corner_radius_all(14)
+	style_normal.set_border_width_all(3)
+	style_normal.border_color = Color(0.8, 0.7, 0.35, 0.9)
+	style_normal.shadow_color = Color(0, 0, 0, 0.6)
+	style_normal.shadow_size = 10
+	card_btn.add_theme_stylebox_override("normal", style_normal)
+
+	var style_hover = style_normal.duplicate()
+	style_hover.bg_color = Color(0.2, 0.22, 0.28)
+	style_hover.border_color = Color(1.0, 0.9, 0.45)
+	style_hover.shadow_size = 16
+	card_btn.add_theme_stylebox_override("hover", style_hover)
+
+	container.add_child(card_btn)
+
+	# 카드 내부 텍스처 (크고 명확하게 카드 이미지 전면 노출)
 	if data and ResourceLoader.exists(data.image_path):
 		var tex_rect = TextureRect.new()
 		tex_rect.texture = data.get_texture()
 		tex_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		tex_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		tex_rect.custom_minimum_size = Vector2(200, 160)
-		vbox.add_child(tex_rect)
+		tex_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
+		tex_rect.offset_left = 6
+		tex_rect.offset_top = 6
+		tex_rect.offset_right = -6
+		tex_rect.offset_bottom = -6
+		tex_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		card_btn.add_child(tex_rect)
 
-	var name_lbl = Label.new()
-	name_lbl.text = card_name + " (코스트: %d)" % card_cost
-	name_lbl.add_theme_font_size_override("font_size", 20)
-	name_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vbox.add_child(name_lbl)
+	# 프로모션 스타일 마우스 호버 애니메이션 (부드럽게 솟아오르고 확대)
+	card_btn.mouse_entered.connect(func():
+		if card_claimed: return
+		var tw = create_tween().set_parallel(true)
+		tw.tween_property(card_btn, "position:y", -14.0, 0.15).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		tw.tween_property(card_btn, "scale", Vector2(1.06, 1.06), 0.15).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	)
+	card_btn.mouse_exited.connect(func():
+		if card_claimed: return
+		var tw = create_tween().set_parallel(true)
+		tw.tween_property(card_btn, "position:y", 0.0, 0.15).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		tw.tween_property(card_btn, "scale", Vector2(1.0, 1.0), 0.15).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	)
 
-	var desc_lbl = Label.new()
-	desc_lbl.text = card_desc
-	desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
-	desc_lbl.add_theme_font_size_override("font_size", 14)
-	desc_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vbox.add_child(desc_lbl)
+	card_btn.pressed.connect(func():
+		_claim_card(card_id, card_name, card_btn)
+	)
 
-	var claim_btn = Button.new()
-	claim_btn.text = "덱에 추가"
-	claim_btn.custom_minimum_size = Vector2(180, 45)
-	claim_btn.add_theme_font_size_override("font_size", 18)
-	claim_btn.pressed.connect(func(): _claim_card(card_id, card_name))
-	vbox.add_child(claim_btn)
+	return container
 
-	return panel
-
-func _claim_card(card_id: String, card_name: String):
+func _claim_card(card_id: String, card_name: String, selected_btn: Button):
 	if card_claimed: return
 	card_claimed = true
 	var pm = get_pm()
@@ -162,7 +189,14 @@ func _claim_card(card_id: String, card_name: String):
 	status_label.text = "✨ [%s] 카드를 덱에 추가했습니다!" % card_name
 
 	for child in card_options_container.get_children():
-		child.modulate = Color(0.5, 0.5, 0.5, 0.6)
+		var btn = child.get_child(0) as Button
+		if btn == selected_btn:
+			var tw = create_tween().set_parallel(true)
+			tw.tween_property(btn, "position:y", -18.0, 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+			tw.tween_property(btn, "scale", Vector2(1.1, 1.1), 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+			btn.modulate = Color(1.2, 1.2, 1.2, 1.0)
+		else:
+			btn.modulate = Color(0.4, 0.4, 0.4, 0.45)
 
 func _on_remove_card_pressed():
 	if card_removed:
@@ -198,7 +232,7 @@ func _on_remove_card_pressed():
 	center_pop.add_child(pop_vbox)
 
 	var p_title = Label.new()
-	p_title.text = "🗑️ 덱에서 삭제할 카드를 선택하세요"
+	p_title.text = "덱에서 삭제할 카드를 선택하세요"
 	p_title.add_theme_font_size_override("font_size", 32)
 	p_title.add_theme_color_override("font_color", Color(1.0, 0.5, 0.5))
 	p_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER

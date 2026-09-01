@@ -145,6 +145,8 @@ func start_turn():
 	var bm = get_tree().get_first_node_in_group("BoardManager")
 	if bm:
 		bm.reset_all_action_tokens()
+		if bm.has_method("reset_turn_captured_enemy_count"):
+			bm.reset_turn_captured_enemy_count()
 	
 	print("내 턴 시작! 지정된 카드 장수(", turn_draw_amount, "장)를 드로우합니다.")
 	execute_drawing(turn_draw_amount)
@@ -579,6 +581,13 @@ func _try_play_or_return_card(mouse_pos: Vector2):
 		elif data.id == "t_quick_decision":
 			if bm and bm.has_method("apply_quick_decision"):
 				bm.apply_quick_decision()
+		elif data.id == "t_sabotage":
+			if bm and bm.has_method("activate_sabotage"):
+				bm.activate_sabotage()
+		elif data.id == "t_spoils":
+			apply_spoils()
+		elif data.id == "t_two_cats":
+			execute_drawing(2)
 
 		# 기물 행동권(토큰) 부여 처리
 		if CardData.CardType.PIECE == data.type or "Piece" in data.tags:
@@ -613,6 +622,17 @@ func _try_play_or_return_card(mouse_pos: Vector2):
 		
 		selected_card = null
 		_recalculate_hand_positions()
+
+# --- 전리품 (Spoils) 카드 효과 ---
+func apply_spoils() -> void:
+	var bm = get_tree().get_first_node_in_group("BoardManager")
+	if bm and "captured_enemy_count_this_turn" in bm and bm.captured_enemy_count_this_turn >= 1:
+		print("CardManager: [전리품] 이번 턴 적 기물 %d개 포획 성공! 코스트 +2 획득 및 카드 1장 드로우!" % bm.captured_enemy_count_this_turn)
+		current_cost += 2
+		_update_cost_ui()
+		execute_drawing(1)
+	else:
+		print("CardManager: [전리품] 이번 턴 포획한 적 기물이 없습니다 (%d개). 카드가 소모되었지만 효과가 발동하지 않았습니다." % (bm.captured_enemy_count_this_turn if bm else 0))
 
 # 카드를 사용하거나 버릴 때 버린 카드 더미(우측 하단)로 빨려 들어가는 시각 효과
 func _animate_discard_card(card_3d: CardVisual3D):

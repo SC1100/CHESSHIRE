@@ -121,11 +121,31 @@ func apply_quick_decision() -> void:
 			
 	add_action_token("King", 1)
 
+# --- 방해 공작 (Sabotage) ---
+var is_sabotaged: bool = false
+
+func activate_sabotage() -> void:
+	is_sabotaged = true
+	print("BoardManager: [방해 공작] 디버프 발동! 다음 상대방 턴 동안 최대 행동 횟수가 1회로 제한됩니다.")
+
+func reset_sabotage() -> void:
+	if is_sabotaged:
+		is_sabotaged = false
+		print("BoardManager: 방해 공작 디버프 효과가 해제되었습니다.")
+
+# --- 이번 턴 적 기물 포획 카운터 ---
+var captured_enemy_count_this_turn: int = 0
+
+func reset_turn_captured_enemy_count() -> void:
+	captured_enemy_count_this_turn = 0
+
 func clear_custom_rules() -> void:
 	active_custom_rules.clear()
 	friendly_capture_charges = 0
+	captured_enemy_count_this_turn = 0
 	reset_lance_charge()
 	reset_last_stand()
+	reset_sabotage()
 
 # --- Player Team Control ---
 @export var player_team: PieceData.Team = PieceData.Team.WHITE
@@ -390,6 +410,11 @@ func attempt_move(piece: Node, target_tile_name: String) -> bool:
 					is_victory_captured = true
 				else:
 					is_defeat_captured = true
+			
+			# 적 기물이 잡힌 경우 (플레이어 기물이 포획)
+			if is_player_piece(piece) and not is_player_piece(target_piece):
+				captured_enemy_count_this_turn += 1
+				print("BoardManager: 이번 턴 적 기물 포획! (누적 포획 수: %d)" % captured_enemy_count_this_turn)
 			
 			# 아군 기물이 잡힌 경우 전멸 상태 검사 및 차감 처리
 			if is_player_piece(target_piece):

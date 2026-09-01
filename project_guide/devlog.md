@@ -49,7 +49,22 @@ Git 커밋 로그만으로는 파악하기 힘든 기획 의도, 구조적 판�
             *   해당 나이트가 2회 이동을 완전히 마치면 `max_moves = 1` 복구 및 임시 포인터와 `knight_no_jump` 점프 차단 룰이 완벽히 원복됨.
         *   **2차 이동 조작성 개선 (`BoardInput.gd`)**: 1차 이동 성공 시 `selected_piece` 선택을 해제하지 않고 유지하며, 새로 이동한 위치 기준의 2차 이동 3D 닷 하이라이트(`show_valid_moves`)를 자동 갱신하여 2번째 이동이 바로 연속 가능하도록 심리스 연동 완료.
         *   `ChessRules.gd` 행마법 검사: 나이트의 직진 1칸 앞 인접 길목 타일(상/하/좌/우)에 기물이 막혀 있을 경우 대각선 점프 이동을 차단하도록 경로 검사 적용.
-        *   기본 지급 덱 구성(`ProfileManager.gd`, `PlayerData.gd`)의 테스트 카드를 **`빠른 판단(t_quick_decision)`**으로 변경 완료.
+        *   **보상 선택 UI(RewardUI.gd) 프로모션 스타일 개편 및 4장 확장**:
+            *   카드 하단의 불필요한 중복 텍스트(이름, 코스트, 설명, 버튼)를 제거하고 카드 아트워크 자체를 크고 시원하게 렌더링.
+            *   보상 선택지 수를 **기본 3장 ➔ 4장**으로 확장하여 선택의 폭 확대.
+            *   프로모션 UI와 동일한 부드러운 마우스 호버(위로 솟아오름 및 1.06배 확대) 연동 및 선택 시 골드 하이라이트/비선택 카드 어둡게 처리 연출 적용.
+        *   **기본 덱 10장 구성 재설정 (`ProfileManager.gd`, `PlayerData.gd`)**: 킹 1장, 퀸 1장, 룩 1장, 나이트 1장, 비숍 1장, 폰 3장, 고양이 두 마리 1장, 빠른 판단 1장 총 10장 구성으로 최종 배치 완료.
+    *   **전술 스킬 카드 [고양이 두 마리 / Two Cats] 기능 구현 (`CardManager.gd`, `ProfileManager.gd`)**:
+        *   `t_two_cats` (코스트 1) 사용 시 `CardManager.execute_drawing(2)`를 호출하여 덱에서 카드 2장을 연속으로 비행 착지시키는 드로우 시퀀스 연동.
+    *   **전술 스킬 카드 [전리품 / Spoils] 기능 구현 (`BoardManager.gd`, `CardManager.gd`, `ProfileManager.gd`)**:
+        *   `BoardManager.gd`에 이번 턴 적 기물 포획 수 카운터(`captured_enemy_count_this_turn: int`) 시스템 구축 (플레이어 기물이 적 기물을 잡을 때마다 자동 증가 및 턴 시작 시 리셋).
+        *   `t_spoils` (코스트 1) 사용 시 `captured_enemy_count_this_turn >= 1` 조건을 검사:
+            *   **포획 적 기물 1개 이상 존재 시**: **코스트 +2 획득** (UI 갱신) 및 **카드 1장 즉시 드로우**.
+            *   **포획 기물 0개 시**: 카드는 코스트(1)를 지불하고 버린 카드 더미로 소모되나, 보상 효과 없이 깔끔하게 소멸 (옵션 B 반영).
+    *   **전술 스킬 카드 [방해 공작 / Sabotage] 기능 구현 (`BoardManager.gd`, `CardManager.gd`, `AITestRunner.gd`, `ProfileManager.gd`)**:
+        *   `t_sabotage` (코스트 2) 사용 시 `BoardManager.activate_sabotage()`를 호출하여 상대방 디버프 플래그(`is_sabotaged = true`) 활성화.
+        *   직후 시작되는 상대방(AI) 턴 실행 루프(`AITestRunner.execute_turn()`)에서 디버프 상태를 검사하여 이번 턴 최대 행동 횟수를 **기본 2회 ➔ 1회로 제한**.
+        *   상대 턴 행동 1회 완료 시 `reset_sabotage()`를 호출하여 디버프를 안전하게 해제 및 원복 연동.
     *   **전술 스킬 카드 [빠른 판단 / Quick Decision] 기능 구현 (`BoardManager.gd`, `CardManager.gd`, `Piece.gd`, `ProfileManager.gd`)**:
         *   `t_quick_decision` (코스트 1) 사용 시 `BoardManager.apply_quick_decision()`을 호출하여 킹의 현재 턴 내 행동 상태(`move_count`)를 검사.
         *   **이동 횟수 중복 카운트 버그 수정 (`BoardInput.gd`, `AITestRunner.gd`)**:

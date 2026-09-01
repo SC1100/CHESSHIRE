@@ -4,15 +4,15 @@
 		"hp": 100,
 		"is_in_run": true,
 		"master_deck": [
-			"w_pawn",
-			"w_pawn",
-			"w_pawn",
-			"w_pawn",
+			"w_king",
+			"w_queen",
+			"w_rook",
 			"w_knight",
 			"w_bishop",
-			"w_rook",
-			"w_queen",
-			"w_king",
+			"w_pawn",
+			"w_pawn",
+			"w_pawn",
+			"t_two_cats",
 			"t_quick_decision"
 		],
 		"stage_snapshot": {
@@ -46,12 +46,12 @@
 			"discard_pile": [],
 			"draw_pile": [],
 			"hand": [],
-			"saved_at": "2026-09-01T16:28:53",
+			"saved_at": "2026-09-01T17:15:13",
 			"stage_id": "stage1"
 		}
 	},
 	"permanent_data": {
-		"total_runs": 24.0,
+		"total_runs": 30.0,
 		"unlocked_cards": [
 			"w_pawn",
 			"w_knight",

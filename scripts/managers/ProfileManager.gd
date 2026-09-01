@@ -94,9 +94,9 @@ func has_active_run() -> bool:
 func start_new_run() -> void:
 	print("ProfileManager: 신규 런을 시작합니다. (런 데이터 초기화)")
 	var default_deck = [
-		"w_pawn", "w_pawn", "w_pawn", "w_pawn",
-		"w_knight", "w_bishop", "w_rook", "w_queen", "w_king",
-		"t_quick_decision"
+		"w_king", "w_queen", "w_rook", "w_knight", "w_bishop",
+		"w_pawn", "w_pawn", "w_pawn",
+		"t_two_cats", "t_quick_decision"
 	]
 	
 	profile_data["current_run"] = {
