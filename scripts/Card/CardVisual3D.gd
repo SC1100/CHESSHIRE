@@ -8,6 +8,8 @@ var collision_shape: CollisionShape3D
 # 애니메이션 및 위치 제어용 변수
 var target_position: Vector3 = Vector3.ZERO
 var target_rotation: Vector3 = Vector3.ZERO
+var target_scale: Vector3 = Vector3.ONE
+var is_hovered: bool = false
 var is_dragging: bool = false
 var is_drawing: bool = false # 드로우 애니메이션 진행 여부
 
@@ -64,18 +66,16 @@ func _process(delta: float):
 	if is_dragging or is_drawing:
 		return # 드래그 중이거나 드로우 애니메이션 중에는 외부(매니저/트윈)에서 위치를 제어합니다.
 		
-	# 드래그 중이 아닐 때는 목표 위치(부채꼴 대형)로 부드럽게 날아갑니다.
-	global_position = global_position.lerp(target_position, 10.0 * delta)
+	# 1. 위치 보간
+	global_position = global_position.lerp(target_position, 12.0 * delta)
 	
-	# 회전 보간 시에는 쿼터니언(Quaternion)을 사용하는 것이 안전합니다.
-	# 부모 노드(CardManager)가 Scale을 가지고 있기 때문에, 단순 형변환이 아닌 get_rotation_quaternion()을 써야 합니다.
-	var current_scale = global_transform.basis.get_scale()
-	var current_quat = global_transform.basis.get_rotation_quaternion()
-	var target_quat = Quaternion.from_euler(target_rotation)
+	# 2. 회전 보간 (lerp_angle로 오일러 각도를 안전하게 보간하여 NaN 행렬 붕괴 방지)
+	global_rotation.x = lerp_angle(global_rotation.x, target_rotation.x, 12.0 * delta)
+	global_rotation.y = lerp_angle(global_rotation.y, target_rotation.y, 12.0 * delta)
+	global_rotation.z = lerp_angle(global_rotation.z, target_rotation.z, 12.0 * delta)
 	
-	var new_basis = Basis(current_quat.slerp(target_quat, 10.0 * delta))
-	# 회전 후 기존 글로벌 스케일을 다시 곱해줍니다.
-	global_transform.basis = new_basis.scaled(current_scale)
+	# 3. 크기 보간 (Node3D scale 독립 보간)
+	scale = scale.lerp(target_scale, 12.0 * delta)
 
 # 카드 앞/뒷면 메쉬의 알파(투명도) 일괄 조정 헬퍼
 func set_card_alpha(alpha: float) -> void:
@@ -84,3 +84,9 @@ func set_card_alpha(alpha: float) -> void:
 			var mat = child.material_override as StandardMaterial3D
 			if mat:
 				mat.albedo_color.a = clampf(alpha, 0.0, 1.0)
+
+# 카드 3D 메쉬의 렌더링 우선순위(sorting_offset) 일괄 조정 헬퍼
+func set_sorting_offset(offset: float) -> void:
+	for child in get_children():
+		if child is VisualInstance3D:
+			child.sorting_offset = offset

@@ -19,6 +19,7 @@ var current_state: State = State.IDLE
 
 var deck_component: DeckComponent
 var selected_card: CardVisual3D = null
+var hovered_card: CardVisual3D = null
 
 # 덱 시각화 관련 변수
 var deck_visual: Area3D
@@ -99,12 +100,15 @@ func _setup_test_ui():
 	vbox.add_theme_constant_override("separation", 10)
 	canvas.add_child(vbox)
 	
-	# 코스트 표시 라벨 추가
+	# 코스트 표시 라벨 추가 (좌측 중단 아래, 카드덱 이미지 바로 위)
 	cost_label = Label.new()
 	cost_label.text = "현재 코스트: " + str(current_cost) + " / " + str(turn_max_cost)
 	cost_label.add_theme_font_size_override("font_size", 28)
-	cost_label.add_theme_color_override("font_color", Color(0.2, 0.6, 1.0)) # 코스트 느낌의 파란색
-	vbox.add_child(cost_label)
+	cost_label.add_theme_color_override("font_color", Color.WHITE) # 깔끔한 흰색 텍스트
+	cost_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9)) # 선명한 아웃라인
+	cost_label.add_theme_constant_override("outline_size", 8)
+	cost_label.position = Vector2(45, 570) # 좌측 중단 아래 (카드덱 이미지 바로 위)
+	canvas.add_child(cost_label)
 	
 	var draw_btn = Button.new()
 	draw_btn.text = "1장 드로우 (테스트)"
@@ -443,27 +447,41 @@ func _recalculate_hand_positions():
 	var count = card_visuals.size()
 	if count == 0: return
 	
-	var total_angle = (count - 1) * hand_spacing
-	var start_angle = total_angle / 2.0
+	# 동적 카드 간격 세팅 (기본 0.88m 간격으로 넓히고, 손패가 아주 많아지면 최대 폭 7.0m 이내로 자동 슬림 압축)
+	var max_hand_width: float = 7.0
+	var base_spacing: float = 0.88
+	var card_spacing_x: float = minf(base_spacing, max_hand_width / maxf(1.0, float(count - 1)))
+	var total_width: float = (count - 1) * card_spacing_x
+	var start_x: float = total_width / 2.0 # i=0 첫 카드가 오른쪽 끝(+X)에 배치됨
 	
 	for i in range(count):
 		var card = card_visuals[i]
 		if card == selected_card:
+			card.set_sorting_offset(200.0) # 잡고 있는 카드는 최우선순위 렌더링
 			continue # 마우스로 잡고 있는 카드는 정렬 대형에서 제외
 			
-		var angle = start_angle - (i * hand_spacing)
-		
-		# CardManager의 로컬 좌표계 기준으로 부채꼴 수학 연산
-		# Y축 아래를 중심으로 카드가 둥글게 배치되도록 합니다.
+		# 첫 번째 카드(i=0)가 오른쪽 끝(+X), 다음 카드(i=1, 2...)가 왼쪽(-X)으로 배치됨
+		var card_x: float = start_x - (i * card_spacing_x)
+		var z_order_offset: float = float(count - 1 - i) # i=0(가장 오른쪽)이 가장 위(최상단 레이어)에 위치함
 		var local_pos = Vector3(
-			sin(angle) * hand_radius,
-			cos(angle) * hand_radius - hand_radius,
-			abs(angle) * 0.1 # 양 끝에 있는 카드는 살짝 뒤(Z)로 밀어서 겹침을 방지
+			card_x,
+			0.0,
+			0.0 # 3D 깊이 차이로 인한 화면 투영 경사도를 없애 100% 완전한 수평 baseline 정렬
 		)
 		
-		# 카드들이 호를 따라 회전하도록 설정 (Z축 회전)
-		var local_rot = Vector3(0, 0, -angle)
+		# 직선 정렬을 위해 카드 기울기 제거 (수직 똑바로 세움)
+		var local_rot = Vector3.ZERO
 		
+		# 마우스 호버(Hover) 시 플레이어 눈앞(+0.25m Z)으로 쑥 다가오고 렌더링 레이어 최상단(100.0) 지정
+		if card == hovered_card:
+			local_pos.y += 0.10 # 약간의 가독성 상승 보정
+			local_pos.z += 0.25 # 플레이어 가슴/눈 앞으로 쑥 다가옴
+			card.target_scale = Vector3(1.15, 1.15, 1.15) # 1.15배 선명 확대
+			card.set_sorting_offset(100.0) # 호버 카드는 무조건 3D 최상단 렌더링
+		else:
+			card.target_scale = Vector3.ONE
+			card.set_sorting_offset(z_order_offset) # 맨 오른쪽(i=0)이 가장 위, 왼쪽으로 갈수록 차곡차곡 밑에 배치 (sorting_offset으로 겹침 제어)
+			
 		card.target_position = to_global(local_pos)
 		card.target_rotation = global_transform.basis.get_euler() + local_rot
 
@@ -476,6 +494,10 @@ func _unhandled_input(event: InputEvent):
 			
 	# FSM: 드로우/애니메이션 중에는 플레이어의 마우스/키보드 입력을 완전 차단
 	if current_state != State.IDLE:
+		if hovered_card:
+			hovered_card.is_hovered = false
+			hovered_card = null
+			_recalculate_hand_positions()
 		return
 		
 	if not main_camera: return
@@ -496,6 +518,9 @@ func _unhandled_input(event: InputEvent):
 				selected_card.global_position = selected_card.global_position.lerp(intersect, 20.0 * get_process_delta_time())
 				# 들고 있을 때는 기울어지지 않고 똑바로 세움 (스케일 파괴 방지)
 				selected_card.global_rotation = main_camera.global_rotation
+		else:
+			# 마우스 커서 위치에 있는 손패 3D 카드 실시간 호버 검사
+			_update_hovered_card(event.position)
 				
 	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if event.pressed:
@@ -506,6 +531,31 @@ func _unhandled_input(event: InputEvent):
 			# 마우스 놓기: 사용 또는 취소 판정
 			if selected_card != null:
 				_try_play_or_return_card(event.position)
+
+# 마우스 커서에 있는 손패 카드를 3D 레이캐스트로 탐지하여 호버 효과 적용
+func _update_hovered_card(mouse_pos: Vector2):
+	var space_state = get_world_3d().direct_space_state
+	var ray_origin = main_camera.project_ray_origin(mouse_pos)
+	var ray_dir = main_camera.project_ray_normal(mouse_pos)
+	
+	var query = PhysicsRayQueryParameters3D.new()
+	query.from = ray_origin
+	query.to = ray_origin + ray_dir * 100.0
+	query.collision_mask = 2 # 카드 전용 레이어
+	query.collide_with_areas = true
+	
+	var result = space_state.intersect_ray(query)
+	var new_hovered: CardVisual3D = null
+	if result and result.collider is CardVisual3D and card_visuals.has(result.collider):
+		new_hovered = result.collider
+		
+	if new_hovered != hovered_card:
+		if hovered_card and is_instance_valid(hovered_card):
+			hovered_card.is_hovered = false
+		hovered_card = new_hovered
+		if hovered_card:
+			hovered_card.is_hovered = true
+		_recalculate_hand_positions()
 
 func _raycast_to_pickup_card(mouse_pos: Vector2):
 	var space_state = get_world_3d().direct_space_state
@@ -523,6 +573,9 @@ func _raycast_to_pickup_card(mouse_pos: Vector2):
 	if result:
 		var hit_collider = result.collider
 		if hit_collider is CardVisual3D:
+			if hovered_card and is_instance_valid(hovered_card):
+				hovered_card.is_hovered = false
+				hovered_card = null
 			selected_card = hit_collider
 			selected_card.is_dragging = true
 			_recalculate_hand_positions() # 집어든 카드를 제외하고 빈자리 좁히기

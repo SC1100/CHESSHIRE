@@ -36,8 +36,9 @@ func _build_ui():
 	center_container.add_child(main_container)
 
 	# 타이틀
+	var is_final_stage = (BoardManager.current_stage_id == "stage3")
 	var title_label = Label.new()
-	title_label.text = "STAGE CLEAR!"
+	title_label.text = "ALL STAGES CLEAR!" if is_final_stage else "STAGE CLEAR!"
 	title_label.add_theme_font_size_override("font_size", 54)
 	title_label.add_theme_color_override("font_color", Color(1.0, 0.85, 0.3))
 	title_label.add_theme_color_override("font_outline_color", Color(0, 0, 0))
@@ -69,52 +70,85 @@ func _build_ui():
 	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	main_container.add_child(status_label)
 
-	# 하단 버튼 하모니 (카드 삭제 / 다음 스테이지)
+	# 하단 버튼 하모니 (카드 삭제 / 덱 유지 1스테이지 재도전 / 다음 스테이지 또는 런 종료)
 	var btn_hbox = HBoxContainer.new()
 	btn_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
 	btn_hbox.add_theme_constant_override("separation", 20)
 	main_container.add_child(btn_hbox)
 
 	var remove_btn = Button.new()
-	remove_btn.text = "🗑️ 덱에서 카드 1장 삭제 (정제)"
+	remove_btn.text = "덱에서 카드 1장 삭제"
 	remove_btn.custom_minimum_size = Vector2(260, 50)
 	remove_btn.add_theme_font_size_override("font_size", 18)
 	remove_btn.pressed.connect(_on_remove_card_pressed)
 	btn_hbox.add_child(remove_btn)
 
+	if is_final_stage:
+		# 3스테이지 클리어 특수 선택지: 덱을 유지한 채 1스테이지 재도전 (회차 루프)
+		var loop_btn = Button.new()
+		loop_btn.text = "덱 유지하고 1스테이지 재도전"
+		loop_btn.custom_minimum_size = Vector2(280, 50)
+		loop_btn.add_theme_font_size_override("font_size", 18)
+		loop_btn.add_theme_color_override("font_color", Color(0.4, 0.9, 1.0))
+		loop_btn.pressed.connect(_on_restart_with_current_deck_pressed)
+		btn_hbox.add_child(loop_btn)
+
 	var next_btn = Button.new()
-	next_btn.text = "다음 스테이지로 ➔"
+	next_btn.text = "런 완료 (메인으로)" if is_final_stage else "다음 스테이지로 ➔"
 	next_btn.custom_minimum_size = Vector2(200, 50)
-	next_btn.add_theme_font_size_override("font_size", 20)
+	next_btn.add_theme_font_size_override("font_size", 18 if is_final_stage else 20)
 	next_btn.pressed.connect(_on_next_stage_pressed)
 	btn_hbox.add_child(next_btn)
 
 func _generate_card_rewards():
-	var pm = get_pm()
-	var unlocked_pool: Array[String] = []
-	if pm and pm.has_method("get_unlocked_cards"):
-		unlocked_pool = pm.get_unlocked_cards()
-	if unlocked_pool.is_empty():
-		unlocked_pool = CardData.database.keys()
-	else:
-		# 보상 선택 폭 확장을 위해 CardData의 전체 카드 풀도 포함하여 셔플
-		for key in CardData.database.keys():
-			if not unlocked_pool.has(key):
-				unlocked_pool.append(key)
+	var piece_pool: Array[String] = []
+	var tactic_pool: Array[String] = []
 
-	unlocked_pool.shuffle()
+	# 전체 카드 DB에서 기물 카드와 전술 카드를 각각 분리
+	for card_id in CardData.database.keys():
+		if _is_piece_card(card_id):
+			piece_pool.append(card_id)
+		else:
+			tactic_pool.append(card_id)
+
+	piece_pool.shuffle()
+	tactic_pool.shuffle()
+
 	var selected_cards: Array[String] = []
-	for i in range(min(4, unlocked_pool.size())):
-		selected_cards.append(unlocked_pool[i])
 
-	while selected_cards.size() < 4 and not unlocked_pool.is_empty():
-		var pick = unlocked_pool.pick_random()
-		if not selected_cards.has(pick):
+	# 보상 카드 4슬롯을 순회하며 슬롯별로 기물(40%) / 전술(60%) 확률 롤 적용
+	for slot in range(4):
+		var pick: String = ""
+		var roll = randf() # 0.0 ~ 1.0 무작위 난수
+		
+		# 40% 확률로 기물 카드, 60% 확률로 전술 카드 선호 선택
+		if roll < 0.40:
+			pick = _pick_unique_card(piece_pool, selected_cards)
+			if pick == "":
+				pick = _pick_unique_card(tactic_pool, selected_cards)
+		else:
+			pick = _pick_unique_card(tactic_pool, selected_cards)
+			if pick == "":
+				pick = _pick_unique_card(piece_pool, selected_cards)
+
+		if pick != "":
 			selected_cards.append(pick)
 
 	for card_id in selected_cards:
 		var card_panel = _create_reward_card_panel(card_id)
 		card_options_container.add_child(card_panel)
+
+func _is_piece_card(card_id: String) -> bool:
+	var data = CardData.database.get(card_id, null)
+	if data:
+		return data.type == CardData.CardType.PIECE or "Piece" in data.tags
+	return card_id.begins_with("w_")
+
+func _pick_unique_card(pool: Array[String], already_selected: Array[String]) -> String:
+	for card_id in pool:
+		if not already_selected.has(card_id):
+			return card_id
+	return ""
 
 func _create_reward_card_panel(card_id: String) -> Control:
 	var container = Control.new()
@@ -186,7 +220,7 @@ func _claim_card(card_id: String, card_name: String, selected_btn: Button):
 	var pm = get_pm()
 	if pm and pm.has_method("add_card_to_master_deck"):
 		pm.add_card_to_master_deck(card_id)
-	status_label.text = "✨ [%s] 카드를 덱에 추가했습니다!" % card_name
+	status_label.text = "[ %s ] 카드를 덱에 추가했습니다!" % card_name
 
 	for child in card_options_container.get_children():
 		var btn = child.get_child(0) as Button
@@ -280,11 +314,21 @@ func _create_removal_card_panel(card_id: String, pm: Node, pop_canvas: CanvasLay
 		if pm and pm.has_method("remove_card_from_master_deck"):
 			pm.remove_card_from_master_deck(card_id)
 		card_removed = true
-		status_label.text = "🗑️ [%s] 카드를 덱에서 삭제했습니다!" % card_name
+		status_label.text = "[ %s ] 카드를 덱에서 삭제했습니다." % card_name
 		pop_canvas.queue_free()
 	)
 
 	return btn
+
+# --- 3스테이지 완료 후 현재 덱을 유지한 채 1스테이지로 재도전 (회차 플레이) ---
+func _on_restart_with_current_deck_pressed():
+	BoardManager.current_stage_id = "stage1"
+	var pm = get_pm()
+	if pm and "profile_data" in pm and pm.profile_data.has("current_run"):
+		pm.profile_data["current_run"]["current_stage_id"] = "stage1"
+		pm.save_profile()
+	print("RewardUI: 강화된 덱을 그대로 유지한 채 1스테이지 재도전(NEW GAME+)을 시작합니다!")
+	get_tree().change_scene_to_file("res://Scene/Battle_Scene.tscn")
 
 func _on_next_stage_pressed():
 	# 현재 스테이지 확인 후 다음 스테이지 진입
