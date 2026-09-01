@@ -264,8 +264,11 @@ func _on_next_stage_pressed():
 	elif current_id == "test_stage":
 		next_id = "stage1"
 	elif current_id == "stage3":
-		# 모든 스테이지 완료 시 스테이지 선택 화면으로 복귀
-		print("RewardUI: 모든 스테이지를 클리어했습니다!")
+		# 모든 스테이지 완료 시 런 소멸 처리 및 스테이지 선택 화면으로 복귀
+		print("RewardUI: 모든 스테이지를 클리어했습니다! 런을 성공적으로 완료합니다.")
+		var pm_node = get_pm()
+		if pm_node and pm_node.has_method("clear_current_run"):
+			pm_node.clear_current_run()
 		get_tree().change_scene_to_file("res://Scene/Stage.tscn")
 		return
 	

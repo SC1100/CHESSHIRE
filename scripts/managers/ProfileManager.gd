@@ -49,18 +49,24 @@ func create_default_profile(nickname: String) -> Dictionary:
 			"created_at": Time.get_datetime_string_from_system()
 		},
 		"permanent_data": {
-			"unlocked_cards": ["w_pawn", "w_knight", "w_bishop", "w_rook", "w_queen", "w_king"],
-			"total_runs": 1,
+			"unlocked_cards": [
+				"w_pawn", "w_knight", "w_bishop", "w_rook", "w_queen", "w_king",
+				"t_crusade", "t_disband", "t_lance_charge", "t_last_stand",
+				"t_quick_decision", "t_sabotage", "t_spoils", "t_two_cats"
+			],
+			"total_runs": 0,
 			"wins": 0
 		},
 		"current_run": {
-			"is_in_run": true,
+			"is_in_run": false,
 			"current_stage_id": "stage1",
 			"master_deck": [
 				"w_pawn", "w_pawn", "w_pawn", "w_pawn",
-				"w_knight", "w_bishop", "w_rook", "w_queen", "w_king"
+				"w_knight", "w_bishop", "w_rook", "w_queen", "w_king",
+				"t_lance_charge"
 			],
-			"hp": 100
+			"hp": 100,
+			"stage_snapshot": {}
 		}
 	}
 
@@ -77,6 +83,71 @@ func save_profile() -> void:
 		print("ProfileManager: '%s.json'에 프로필 저장이 완료되었습니다." % current_nickname)
 	else:
 		push_error("ProfileManager: 프로필 저장 실패! - %s" % file_path)
+
+# --- 휘발성 런(Current Run) 스냅샷 관리 ---
+
+func has_active_run() -> bool:
+	if profile_data.has("current_run"):
+		return profile_data["current_run"].get("is_in_run", false) == true
+	return false
+
+func start_new_run() -> void:
+	print("ProfileManager: 신규 런을 시작합니다. (런 데이터 초기화)")
+	var default_deck = [
+		"w_pawn", "w_pawn", "w_pawn", "w_pawn",
+		"w_knight", "w_bishop", "w_rook", "w_queen", "w_king",
+		"t_quick_decision"
+	]
+	
+	profile_data["current_run"] = {
+		"is_in_run": true,
+		"current_stage_id": "stage1",
+		"master_deck": default_deck,
+		"hp": 100,
+		"stage_snapshot": {}
+	}
+	
+	if profile_data.has("permanent_data"):
+		profile_data["permanent_data"]["total_runs"] = profile_data["permanent_data"].get("total_runs", 0) + 1
+		
+	save_profile()
+
+func clear_current_run() -> void:
+	print("ProfileManager: 런이 종료되었습니다. (휘발성 런 데이터 소멸)")
+	if profile_data.has("current_run"):
+		profile_data["current_run"]["is_in_run"] = false
+		profile_data["current_run"]["stage_snapshot"] = {}
+	save_profile()
+
+# 스테이지 시작 시점의 스냅샷 채록 및 저장
+func save_stage_snapshot(stage_id: String, board_state: Dictionary, draw_pile: Array, hand: Array, discard_pile: Array) -> void:
+	if not profile_data.has("current_run"):
+		return
+		
+	profile_data["current_run"]["is_in_run"] = true
+	profile_data["current_run"]["current_stage_id"] = stage_id
+	profile_data["current_run"]["stage_snapshot"] = {
+		"stage_id": stage_id,
+		"saved_at": Time.get_datetime_string_from_system(),
+		"board_state": board_state,
+		"draw_pile": draw_pile,
+		"hand": hand,
+		"discard_pile": discard_pile
+	}
+	save_profile()
+	print("ProfileManager: [%s] 스테이지 시작 시점 스냅샷 채록 완료!" % stage_id)
+
+func get_stage_snapshot() -> Dictionary:
+	if profile_data.has("current_run") and profile_data["current_run"].has("stage_snapshot"):
+		return profile_data["current_run"]["stage_snapshot"]
+	return {}
+
+func get_current_stage_id() -> String:
+	if profile_data.has("current_run") and profile_data["current_run"].has("current_stage_id"):
+		return str(profile_data["current_run"]["current_stage_id"])
+	return "stage1"
+
+# --- 덱 및 영구 데이터 접근자 ---
 
 func get_master_deck() -> Array[String]:
 	var deck: Array[String] = []

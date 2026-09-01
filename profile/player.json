@@ -1,9 +1,10 @@
 {
 	"current_run": {
-		"current_stage_id": "stage2",
-		"hp": 100.0,
+		"current_stage_id": "stage1",
+		"hp": 100,
 		"is_in_run": true,
 		"master_deck": [
+			"w_pawn",
 			"w_pawn",
 			"w_pawn",
 			"w_pawn",
@@ -11,11 +12,46 @@
 			"w_bishop",
 			"w_rook",
 			"w_queen",
-			"w_king"
-		]
+			"w_king",
+			"t_quick_decision"
+		],
+		"stage_snapshot": {
+			"board_state": {
+				"a1": "W_Rook_1",
+				"a2": "W_Pawn_1",
+				"b1": "W_Knight_1",
+				"b2": "W_Pawn_2",
+				"b7": "B_Pawn_1",
+				"b8": "B_Knight_1",
+				"c1": "W_Bishop_1",
+				"c2": "W_Pawn_3",
+				"c7": "B_Pawn_2",
+				"d1": "W_Queen_1",
+				"d2": "W_Pawn_4",
+				"d7": "B_Pawn_3",
+				"e1": "W_King_1",
+				"e2": "W_Pawn_5",
+				"e7": "B_Pawn_4",
+				"e8": "B_King_1",
+				"f1": "W_Bishop_2",
+				"f2": "W_Pawn_6",
+				"f7": "B_Pawn_5",
+				"g1": "W_Knight_2",
+				"g2": "W_Pawn_7",
+				"g7": "B_Pawn_6",
+				"g8": "B_Knight_2",
+				"h1": "W_Rook_2",
+				"h2": "W_Pawn_8"
+			},
+			"discard_pile": [],
+			"draw_pile": [],
+			"hand": [],
+			"saved_at": "2026-09-01T16:28:53",
+			"stage_id": "stage1"
+		}
 	},
 	"permanent_data": {
-		"total_runs": 1.0,
+		"total_runs": 24.0,
 		"unlocked_cards": [
 			"w_pawn",
 			"w_knight",

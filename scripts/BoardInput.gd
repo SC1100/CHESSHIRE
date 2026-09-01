@@ -117,19 +117,28 @@ func _unhandled_input(event: InputEvent) -> void:
 						piece_tag = parts[1] # W_Knight_1 -> "Knight" 추출
 					
 				if board_manager.attempt_move(selected_piece, current_hovered_tile):
-					# 이동 성공! 토큰 차감 및 행동 횟수 증가
+					# 이동 성공! 토큰 차감
 					board_manager.consume_action_token(piece_tag)
-					if selected_piece.has_method("record_move"):
-						selected_piece.record_move()
 						
-					# 이동 성공! 선택 해제
-					if is_instance_valid(selected_piece) and selected_piece != current_hovered_piece:
-						_set_piece_outline(selected_piece, false)
-					selected_piece = null
+					# 랜스 차징 2회 이동 중 잔여 이동이 남아있는 경우 선택 상태 유지 및 2차 이동 하이라이트 자동 갱신
+					if board_manager.lance_charge_moves_left > 0 and board_manager.lance_charge_target_knight == selected_piece:
+						print("BoardInput: 랜스 차징 2차 이동 대기 - 선택 상태 유지 및 하이라이트 갱신")
+						_set_piece_outline(selected_piece, true)
+						board_manager.show_valid_moves(selected_piece)
+					else:
+						# 이동 성공 및 완전 완료 시 선택 해제
+						if is_instance_valid(selected_piece) and selected_piece != current_hovered_piece:
+							_set_piece_outline(selected_piece, false)
+						selected_piece = null
 					return
 			
 			# 이동 실패 시: 다른 기물을 클릭했으면 선택 변경, 아니면 선택 취소
 			if not current_hovered_piece or current_hovered_piece == selected_piece:
+				# 랜스 차징 중에는 지정된 나이트 해제 금지
+				if board_manager.lance_charge_moves_left > 0 and board_manager.lance_charge_target_knight == selected_piece:
+					print("BoardInput: 랜스 차징 2차 이동 대기 중에는 선택 해제할 수 없습니다.")
+					return
+					
 				# 허공이나 이동 불가능한 빈 타일을 클릭한 경우
 				if is_instance_valid(selected_piece) and selected_piece != current_hovered_piece:
 					_set_piece_outline(selected_piece, false)
@@ -137,20 +146,26 @@ func _unhandled_input(event: InputEvent) -> void:
 				board_manager.clear_valid_moves()
 				return
 				
-		if current_hovered_piece:
+		var target_click_piece = current_hovered_piece
+		if not target_click_piece and current_hovered_tile != "":
+			var tile_piece = board_manager.current_board_state.get(current_hovered_tile)
+			if is_instance_valid(tile_piece) and board_manager.is_player_piece(tile_piece):
+				target_click_piece = tile_piece
+
+		if target_click_piece:
 			# 기물을 새로 클릭한 경우 -> 선택!
-			if selected_piece != current_hovered_piece:
+			if selected_piece != target_click_piece:
 				# 아군 기물인지 검사 (플레이어 진영 기물만 조작 가능)
-				if not board_manager.is_player_piece(current_hovered_piece):
+				if not board_manager.is_player_piece(target_click_piece):
 					info_label.text = "[거절] 아군 기물만 선택할 수 있습니다!"
 					return
 					
 				# 기물 선택 전 행동권 및 턴 제한 검사
 				var piece_tag = "Pawn"
-				if current_hovered_piece.get("data"):
-					piece_tag = current_hovered_piece.get("data").piece_name
-				elif is_instance_valid(current_hovered_piece):
-					var parts = current_hovered_piece.name.split("_")
+				if target_click_piece.get("data"):
+					piece_tag = target_click_piece.get("data").piece_name
+				elif is_instance_valid(target_click_piece):
+					var parts = target_click_piece.name.split("_")
 					if parts.size() >= 2:
 						piece_tag = parts[1] # W_Knight_1 -> "Knight" 추출
 				
@@ -158,13 +173,14 @@ func _unhandled_input(event: InputEvent) -> void:
 					info_label.text = "[거절] 해당 기물의 행동권(카드)이 부족합니다!"
 					return
 					
-				if current_hovered_piece.has_method("can_move") and not current_hovered_piece.can_move():
+				if target_click_piece.has_method("can_move") and not target_click_piece.can_move():
 					info_label.text = "[거절] 이 기물은 이번 턴에 이미 행동했습니다!"
 					return
 					
-				if selected_piece and is_instance_valid(selected_piece) and selected_piece != current_hovered_piece:
+				if selected_piece and is_instance_valid(selected_piece) and selected_piece != target_click_piece:
 					_set_piece_outline(selected_piece, false)
-				selected_piece = current_hovered_piece
+				selected_piece = target_click_piece
+				_set_piece_outline(selected_piece, true)
 				board_manager.show_valid_moves(selected_piece)
 
 func _set_piece_outline(piece: Node, enable: bool) -> void:

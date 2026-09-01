@@ -4,6 +4,7 @@ class_name StageManager
 @onready var stage_1_button: Button = %Stage1Button
 @onready var stage_2_button: Button = %Stage2Button
 @onready var stage_3_button: Button = %Stage3Button
+@onready var back_button: Button = %BackButton
 
 func _ready() -> void:
 	if stage_1_button:
@@ -12,6 +13,16 @@ func _ready() -> void:
 		stage_2_button.pressed.connect(_on_stage_2_pressed)
 	if stage_3_button:
 		stage_3_button.pressed.connect(_on_stage_3_pressed)
+	if back_button:
+		back_button.pressed.connect(_on_back_pressed)
+
+func _on_back_pressed() -> void:
+	get_tree().change_scene_to_file("res://Scene/TitleScene.tscn")
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("ui_cancel") or (event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE):
+		get_viewport().set_input_as_handled()
+		_on_back_pressed()
 
 func _on_stage_1_pressed() -> void:
 	_transition_to_battle("stage1")

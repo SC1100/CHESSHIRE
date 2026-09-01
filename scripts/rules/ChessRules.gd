@@ -26,8 +26,11 @@ static func is_move_valid(piece_name: String, start_tile: String, target_tile: S
 		if is_instance_valid(target_piece):
 			var target_is_white = target_piece.name.begins_with("W_")
 			if is_white == target_is_white:
-				# 특수 카드가 아군 공격을 허용하지 않는 이상 이동 불가
-				if not custom_rules.has("ignore_friendly_fire"):
+				# 특수 카드가 아군 공격/포획을 허용하지 않는 이상 이동 불가
+				if not custom_rules.has("ignore_friendly_fire") and not custom_rules.has("allow_friendly_capture"):
+					return false
+				# 아군 킹 기물은 포획 대상에서 제외 (아군 킹 자멸 방지)
+				if "King" in target_piece.name or target_piece.is_in_group("Objective"):
 					return false
 	
 	var start_pos = get_grid_pos(start_tile)
@@ -73,8 +76,16 @@ static func is_move_valid(piece_name: String, start_tile: String, target_tile: S
 			return false
 
 		"Knight":
-			# L자 이동 (경로 장애물 무시)
+			# L자 이동 (기본적으로 장애물 무시, knight_no_jump 규칙 시 인접 길목 장애물 검사)
 			if (abs_dx == 2 and abs_dy == 1) or (abs_dx == 1 and abs_dy == 2):
+				if custom_rules.has("knight_no_jump"):
+					# 직진 1칸 앞 인접 타일(길목) 위치 계산
+					var step_x = sign(dx) if abs_dx == 2 else 0
+					var step_y = sign(dy) if abs_dy == 2 else 0
+					var first_step_pos = Vector2(start_pos.x + step_x, start_pos.y + step_y)
+					var first_step_tile = String.chr("a".unicode_at(0) + int(first_step_pos.x)) + str(int(first_step_pos.y) + 1)
+					if board_state.has(first_step_tile):
+						return false
 				return true
 			return false
 
@@ -87,6 +98,9 @@ static func is_move_valid(piece_name: String, start_tile: String, target_tile: S
 
 		"Bishop":
 			if abs_dx == abs_dy:
+				if custom_rules.has("ghost_movement"): return true
+				return _is_path_clear(start_pos, target_pos, board_state)
+			elif is_white and custom_rules.has("bishop_straight_move") and (abs_dx == 0 or abs_dy == 0):
 				if custom_rules.has("ghost_movement"): return true
 				return _is_path_clear(start_pos, target_pos, board_state)
 			return false

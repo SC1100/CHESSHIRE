@@ -46,6 +46,17 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
+[node name="BackButton" type="Button" parent="." unique_id=987654321]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(150, 50)
+layout_mode = 0
+offset_left = 30.0
+offset_top = 30.0
+offset_right = 180.0
+offset_bottom = 80.0
+theme_override_font_sizes/font_size = 20
+text = "← 뒤로가기"
+
 [node name="StageButtonContainer" type="HBoxContainer" parent="." unique_id=494463316]
 layout_mode = 1
 anchors_preset = 8

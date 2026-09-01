@@ -73,6 +73,44 @@ func _ready():
 	
 	# 5. 화면 진입 페이드인 암전 연출 (1~2프레임 3D 씬/카메라 로딩 잔상 가림)
 	_setup_fade_in_transition()
+	
+	# 6. 스테이지 시작 시점 스냅샷 자동 저장
+	_record_stage_start_snapshot()
+
+func _record_stage_start_snapshot() -> void:
+	await get_tree().process_frame
+	await get_tree().process_frame
+	
+	var bm = get_tree().get_first_node_in_group("BoardManager")
+	var cm = get_tree().get_first_node_in_group("CardManager")
+	var pm = get_tree().root.get_node_or_null("ProfileManager")
+	
+	if not pm or not pm.has_method("save_stage_snapshot"):
+		return
+		
+	var stage_id = BoardManager.current_stage_id
+	var board_state_snap = {}
+	if bm and "current_board_state" in bm:
+		for tile in bm.current_board_state.keys():
+			var piece = bm.current_board_state[tile]
+			if is_instance_valid(piece):
+				board_state_snap[str(tile)] = piece.name
+				
+	var draw_snap = []
+	var hand_snap = []
+	var discard_snap = []
+	if cm:
+		if "draw_pile" in cm:
+			for card in cm.draw_pile:
+				if "id" in card: draw_snap.append(card.id)
+		if "hand" in cm:
+			for card in cm.hand:
+				if "data" in card and "id" in card.data: hand_snap.append(card.data.id)
+		if "discard_pile" in cm:
+			for card in cm.discard_pile:
+				if "id" in card: discard_snap.append(card.id)
+				
+	pm.save_stage_snapshot(stage_id, board_state_snap, draw_snap, hand_snap, discard_snap)
 
 func _setup_fade_in_transition() -> void:
 	var fade_layer = CanvasLayer.new()
@@ -115,3 +153,16 @@ func _process(_delta: float):
 			if bm.active_tokens[piece] > 0:
 				text += "%s : %d\n" % [piece, bm.active_tokens[piece]]
 		token_label.text = text
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("ui_cancel") or (event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE):
+		if not get_tree().paused:
+			get_viewport().set_input_as_handled()
+			_toggle_pause_menu()
+
+func _toggle_pause_menu() -> void:
+	get_tree().paused = true
+	var pause_script = preload("res://scripts/ui/PauseUI.gd")
+	var pause_ui = pause_script.new()
+	add_child(pause_ui)
+

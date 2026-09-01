@@ -2,6 +2,60 @@
 
 Git 커밋 로그만으로는 파악하기 힘든 기획 의도, 구조적 판단, 그리고 주요 대화(Context) 내용을 날짜별로 기록하는 문서입니다.
 
+## 260901 - 배틀 중 ESC 키 일시정지 (PauseUI) 블러/어두운 배경 오버레이 구축 & 3중 클릭 차단
+*   **작업 내용**:
+    *   **배틀 일시정지 오버레이 컴포넌트 구축 (`PauseUI.gd`)**:
+        *   `process_mode = Node.PROCESS_MODE_ALWAYS`로 설정하여 `get_tree().paused = true` 상태에서도 UI 입력 및 ESC 키 입력을 100% 독립적으로 처리.
+        *   **SCREEN_TEXTURE 쉐이더 기반 블러 & 어두운 반투명 틴트 오버레이** 적용: 뒤쪽 배틀 씬이 부드럽게 블러/암전 처리되어 중앙 일시정지 메뉴가 뚜렷하게 도각되도록 연출.
+        *   `backdrop.mouse_filter = Control.MOUSE_FILTER_STOP`으로 설정하여 **뒤쪽 3D 체스 보드 및 3D 카드 클릭 흡수 차단 (3중 클릭 차단)**.
+        *   **버튼 메뉴 연동**:
+            *   `Resume`: 게임 일시정지 해제(`get_tree().paused = false`) 및 UI 삭제.
+            *   `Option`: 미구현 풋프린트.
+            *   `Title`: 게임 일시정지 해제 후 `res://Scene/TitleScene.tscn`으로 씬 전환.
+            *   `Quit`: `get_tree().quit()`으로 안전한 게임 종료.
+    *   **스테이지 선택 화면 좌측 상단 뒤로가기 버튼 추가 (`Stage.tscn` & `StageManager.gd`)**:
+        *   `Stage.tscn` 좌측 상단(`offset_left=30, offset_top=30`)에 `BackButton`(`← 뒤로가기`) 배치 (요청에 따라 일관성을 위해 호버 확대 제거).
+        *   클릭 및 ESC 핫키 입력 시 `res://Scene/TitleScene.tscn`으로 심리스 복귀 기능 연동.
+    *   **영구 데이터(Permanent) vs 휘발성 런 스냅샷(Current Run) 이원화 세이브 구축 (`ProfileManager.gd`, `TitleManager.gd`, `BattleManager.gd`)**:
+        *   `ProfileManager.gd` 스키마 개편:
+            *   `permanent_data`: 계정 해금 기물(`unlocked_cards`), 누적 플레이 통계(`total_runs`, `wins`) 보존.
+            *   `current_run`: 휘발성 런 상태 (`is_in_run`, `current_stage_id`, `master_deck`, `stage_snapshot`).
+        *   `save_stage_snapshot()`: **스테이지 시작 직후**의 체스 보드 기물 배치(`board_state`), 남은 덱(`draw_pile`), 손패(`hand`), 버린 덱(`discard_pile`)을 스냅샷으로 채록하여 저장.
+        *   `TitleManager.gd` 연동:
+            *   `Continue` (이어하기) 버튼: `has_active_run() == true` 일 때만 동적으로 활성화되며, **클릭 시 비동기 사전로딩 및 최상단 검은색 페이드아웃(0.35s) ➔ 배틀 씬 비동기 로딩 ➔ 스무스 페이드인 연동**을 똑같이 구현하여 회색 잔상 없는 심리스 이어하기 전환 완료.
+            *   `New Game` (새 게임) 버튼: 기존 런 데이터를 리셋(`start_new_run()`)하고 신규 런으로 시작.
+        *   `RewardUI.gd` 연동: 최종 스테이지(Stage 3) 완료 시 `clear_current_run()`을 호출하여 런 휘발성 데이터를 안전하게 소멸.
+    *   **카드 에셋 명명 규칙 표준화 및 전술 카드 8종 데이터베이스 구비 (`CardData.gd` & `ProfileManager.gd`)**:
+        *   `T_` 접두사: **전술(Tactic/Spell) 카드** (예: `T_Crusade.png`, `T_Disband.png` 등)
+        *   `W_` 접두사: **백색 아군 기물 카드** (예: `W_Pawn.png`, `W_Knight.png` 등)
+        *   `B_` 접두사: **흑색 적군 기물 카드** (예: `B_Pawn.png`, `B_Knight.png` 등)
+        *   전술 카드 8종(`t_crusade`, `t_disband`, `t_lance_charge`, `t_last_stand`, `t_quick_decision`, `t_sabotage`, `t_spoils`, `t_two_cats`)을 `CardData.gd` 정적 데이터베이스에 공식 구비 완료.
+    *   **전술 파워 카드 [십자군 / Crusade] 기능 구현 (`ChessRules.gd`, `BoardManager.gd`, `CardManager.gd`)**:
+        *   `t_crusade` 카드 사용 시 전투 전역 특수 규칙 `bishop_straight_move` 활성화 (`BoardManager.add_custom_rule`).
+        *   `ChessRules.gd` 행마법 확장: `is_white` (아군 백색 기물) 조건과 `bishop_straight_move` 규칙이 충족되면 아군 비숍이 대각선뿐만 아니라 **직선(상/하/좌/우)으로도 경로 방해물 검사(`_is_path_clear`) 후 이동 가능**하도록 구현.
+        *   팝업 연출 없이 플레이어가 카드 사용 후 자연스럽게 이동 하이라이트(3D 닷) 및 선택 지점을 통해 직진 이동 가능하도록 심리스하게 통합.
+        *   **기물 관련 전술 카드 사멸(Exhaust) 자동 연동 (`CardManager.gd`)**: `t_crusade` (`"Bishop"`), `t_lance_charge` (`"Knight"`), `t_quick_decision` (`"King"`) 등 특정 기물 태그가 포함된 전술 카드도 체스판 위의 해당 아군 기물이 전멸했을 시 드로우 시점에 `[ BISHOP ] 기물 전멸!`과 함께 자동으로 공중 클로즈업 및 소멸(Exhaust)되도록 기물 태그 판별 시스템(`valid_piece_tags`) 고도화 완료.
+        *   **파워(Power) 및 소멸(Exhaust) 카드 연출 및 메커니즘 통합 (`CardManager.gd`)**: `CardType.POWER` 타입 및 `"Power"`, `"Exhaust"` 태그 카드가 사용될 때 우측 하단 버린 덱으로 빨려 들어가지 않고, **화면 정중앙 카메라 앞으로 올라와 클로즈업된 후 투명하게 페이드 아웃 소멸(`_animate_exhaust_from_hand`)**되면서 소멸 덱(`exhaust_pile`)으로 이동하도록 연출 및 메커니즘을 시각적으로 통일.
+    *   **전술 스킬 카드 [소집 해제 / Disband] 기능 구현 (`ChessRules.gd`, `BoardManager.gd`, `CardManager.gd`, `ProfileManager.gd`)**:
+        *   `t_disband` (코스트 0) 카드 사용 시 `BoardManager.add_friendly_capture_charge(1)`을 통해 이번 턴에 한해 아군 포획 기능(`allow_friendly_capture`) 1회 부여.
+        *   `ChessRules.gd` 검증 확장: `allow_friendly_capture` 규칙 활성화 시 아군 기물이 위치한 타일도 유효 이동 경로로 인정 (단, 아군 킹 기물은 자멸 방지를 위해 포획 불가 예외 처리).
+        *   아군 기물 포획 시 `consume_friendly_capture_charge()`로 즉시 1회 차감되며 규칙이 자동 해제됨. 턴 종료시(`CardManager.end_turn`) 잔여 충전 횟수는 0으로 리셋.
+        *   기본 지급 덱 구성(`ProfileManager.gd`, `PlayerData.gd`)의 테스트 카드를 `십자군(t_crusade)`에서 **`소집 해제(t_disband)`**로 변경 완료.
+    *   **전술 스킬 카드 [랜스 차징 / Lance Charge] 메커니즘 고도화 (`ChessRules.gd`, `BoardManager.gd`, `CardManager.gd`, `ProfileManager.gd`)**:
+        *   **대기(Pending) 콤보 시스템**: `t_lance_charge` 카드 사용 시 즉시 행동권을 주는 대신 `lance_charge_pending` 대기 플래그가 켜지며, 이후 플레이어가 **[나이트 기물 카드]를 사용하는 순간 행동권 +2개와 점프 불가(`knight_no_jump`) 버프가 차징 발동**되도록 콤보 메커니즘 구축.
+        *   **단일 나이트 임시 포인터 및 2회 이동 제한 (`lance_charge_target_knight`)**: 
+            *   차징 발동 후 플레이어가 체스판 위에서 최초로 움직인 특정 나이트 하나만 `lance_charge_target_knight` 포인터로 지정되며 해당 나이트에만 `max_moves = 2`가 선택적으로 부여됨.
+            *   2회 이동이 완전히 끝나기 전까지는 다른 아군 기물을 클릭하더라도 이동 하이라이트가 생성되지 않도록 조작을 제한(`show_valid_moves`).
+            *   해당 나이트가 2회 이동을 완전히 마치면 `max_moves = 1` 복구 및 임시 포인터와 `knight_no_jump` 점프 차단 룰이 완벽히 원복됨.
+        *   **2차 이동 조작성 개선 (`BoardInput.gd`)**: 1차 이동 성공 시 `selected_piece` 선택을 해제하지 않고 유지하며, 새로 이동한 위치 기준의 2차 이동 3D 닷 하이라이트(`show_valid_moves`)를 자동 갱신하여 2번째 이동이 바로 연속 가능하도록 심리스 연동 완료.
+        *   `ChessRules.gd` 행마법 검사: 나이트의 직진 1칸 앞 인접 길목 타일(상/하/좌/우)에 기물이 막혀 있을 경우 대각선 점프 이동을 차단하도록 경로 검사 적용.
+        *   기본 지급 덱 구성(`ProfileManager.gd`, `PlayerData.gd`)의 테스트 카드를 **`빠른 판단(t_quick_decision)`**으로 변경 완료.
+    *   **전술 스킬 카드 [빠른 판단 / Quick Decision] 기능 구현 (`BoardManager.gd`, `CardManager.gd`, `Piece.gd`, `ProfileManager.gd`)**:
+        *   `t_quick_decision` (코스트 1) 사용 시 `BoardManager.apply_quick_decision()`을 호출하여 킹의 현재 턴 내 행동 상태(`move_count`)를 검사.
+        *   **이동 횟수 중복 카운트 버그 수정 (`BoardInput.gd`, `AITestRunner.gd`)**:
+            *   `BoardManager.attempt_move()` 내부에서 `record_move()`가 1회 실행되고 있음에도 불구하고 `BoardInput`과 `AITestRunner`에서 중복 호출되어 1회 이동 시 `move_count`가 2로 급증하던 결함을 해결.
+            *   중복 호출 제거를 통해 킹 1회 이동 시 `move_count = 1`이 정확히 기록되며, `빠른 판단` 카드 사용 시 `move_count`가 `1 ➔ 0`으로 차감되어 킹의 2차 이동이 완벽하게 구동됨.
+
 ---
 
 ## 260831 - 이벤트 기반 사멸 기물 카드 중앙 클로즈업 & [기물 전멸] 3D 텍스트 페이드아웃 소멸(Exhaust) 구축

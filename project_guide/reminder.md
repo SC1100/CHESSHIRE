@@ -49,4 +49,21 @@
 *   **단독 테스트 지원**: 향후 배틀 씬 전체가 아닌 AI 모듈만 격리하여 테스트할 수 있도록, `AITestRunner.gd`의 `_ready()` 함수 내부에 수동 턴 넘기기 UI 코드가 주석 처리된 상태로 보존되어 있습니다. 필요 시 주석을 해제하여 사용할 수 있습니다.
 
 ---
+
+## 5. 카드 에셋 명명 및 데이터 관리 규칙 (Card Asset Naming Rules)
+카드 리소스 파일(`res://Asset/Cards/`) 및 데이터베이스(`CardData.gd`) 관리 시 파일명 접두사 규칙을 엄격히 준수합니다.
+
+*   **`T_` 접두사**: **전술 (Tactic/Spell) 카드**
+    *   예: `T_Crusade.png`, `T_Disband.png`, `T_Lance Charge.png`, `T_Sabotage.png` 등
+    *   기능: 마나를 소모하여 특수 효과, 버프/디버프, 이동 룰 변경 등을 일으키는 전술 카드.
+*   **`W_` 접두사**: **백색 아군 기물 (White Piece) 카드**
+    *   예: `W_Pawn.png`, `W_Knight.png`, `W_Bishop.png`, `W_Rook.png`, `W_Queen.png`, `W_King.png`
+    *   기능: 플레이어 진영의 기물에 행동 토큰을 부여하거나 이동시키는 카드.
+*   **`B_` 접두사**: **흑색 적군 기물 (Black Piece) 카드**
+    *   예: `B_Pawn.png`, `B_Knight.png`, `B_Bishop.png`, `B_Rook.png`, `B_Queen.png`, `B_King.png`
+    *   기능: 적 AI 진영 기물 데이터 카드.
+
+---
+
 > *개발 중 새로운 핵심 로직이나 규칙이 추가되면 이 문서에 지속적으로 업데이트합니다.*
+

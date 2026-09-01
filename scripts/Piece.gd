@@ -8,6 +8,7 @@ var max_moves: int = 1
 
 func reset_moves() -> void:
 	move_count = 0
+	max_moves = 1
 
 func can_move() -> bool:
 	return move_count < max_moves

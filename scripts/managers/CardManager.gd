@@ -154,6 +154,14 @@ func end_turn():
 		return
 	print("내 턴 종료! 남은 손패를 모두 버립니다.")
 	
+	# 턴 종료 시 턴 제한 전술 카드 효과 초기화
+	var bm = get_tree().get_first_node_in_group("BoardManager")
+	if bm:
+		if bm.has_method("reset_friendly_capture_charges"):
+			bm.reset_friendly_capture_charges()
+		if bm.has_method("reset_lance_charge"):
+			bm.reset_lance_charge()
+	
 	# 루프 중 원본 배열을 삭제하는 오류를 막기 위해 손패를 복제해서 사용
 	var cards_to_discard = hand.duplicate()
 	for data in cards_to_discard:
@@ -298,10 +306,11 @@ func execute_drawing(amount: int):
 				card_3d.set_process(false)
 				drawn_cards.append(card_3d)
 				
-				# 전멸된 기물 태그 감지
+				# 전멸된 기물 태그 감지 (기물 카드 및 기물 관련 전술 카드 공통 지원)
+				var valid_piece_tags = ["Pawn", "Knight", "Bishop", "Rook", "Queen", "King"]
 				var piece_tag = ""
 				for tag in data.tags:
-					if tag != "Piece" and tag != "Objective":
+					if tag in valid_piece_tags:
 						piece_tag = tag
 						break
 				
@@ -342,11 +351,15 @@ func execute_drawing(amount: int):
 		
 	current_state = State.IDLE # 애니메이션이 모두 끝나면 상태를 IDLE로 복귀 (조작 가능)
 
-# 손패에 착지한 사멸 카드가 화면 중앙으로 클로즈업되어 [기물 전멸] 안내 후 텍스트와 함께 페이드 아웃 소멸(Exhaust)
-func _animate_exhaust_from_hand(card_3d: CardVisual3D, piece_tag: String):
+# 손패에 착지한 사멸 카드가 화면 중앙으로 클로즈업되어 페이드 아웃 소멸(Exhaust)
+func _animate_exhaust_from_hand(card_3d: CardVisual3D, piece_tag: String = ""):
 	if not is_instance_valid(card_3d): return
 	
+	card_3d.is_dragging = false
 	card_3d.is_drawing = true # lerp 위치 추종 일시 중단
+	card_3d.set_process(false)
+	card_3d.collision_layer = 0
+	card_3d.collision_mask = 0
 	
 	# 1단계: 현재 손패 위치에서 CardManager 씬 카메라 정중앙 위치로 날아오며 클로즈업 확대 (0.35초)
 	var center_pos = to_global(exhaust_card_offset)
@@ -358,30 +371,36 @@ func _animate_exhaust_from_hand(card_3d: CardVisual3D, piece_tag: String):
 	
 	await tween1.finished
 	
-	# 2단계: 3D 전멸 안내 텍스트 생성 (하얀 글씨 + 검은색 테두리 외곽선)
-	var label = Label3D.new()
-	label.text = "[ %s ] 기물 전멸!" % piece_tag.to_upper()
-	label.font_size = exhaust_text_font_size
-	label.outline_size = 12
-	label.outline_modulate = Color(0.0, 0.0, 0.0, 1.0) # 뚜렷한 검은색 외곽선
-	label.modulate = Color(1.0, 1.0, 1.0, 1.0) # 하얀색 글씨
-	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	label.no_depth_test = true # 카드 전면에 시각적으로 뚜렷하게 보이도록 설정
-	add_child(label)
-	label.global_position = center_pos + exhaust_text_offset # 카드 대비 텍스트 상대 위치
+	# 2단계: 3D 안내 텍스트 생성 (기물 태그가 있을 때만)
+	var label: Label3D = null
+	if piece_tag != "":
+		label = Label3D.new()
+		label.text = "[ %s ] 기물 전멸!" % piece_tag.to_upper()
+		label.font_size = exhaust_text_font_size
+		label.outline_size = 12
+		label.outline_modulate = Color(0.0, 0.0, 0.0, 1.0) # 뚜렷한 검은색 외곽선
+		label.modulate = Color(1.0, 1.0, 1.0, 1.0) # 하얀색 글씨
+		label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		label.no_depth_test = true # 카드 전면에 시각적으로 뚜렷하게 보이도록 설정
+		add_child(label)
+		label.global_position = center_pos + exhaust_text_offset # 카드 대비 텍스트 상대 위치
 	
-	# 지정된 노출 시간 동안 대기하여 플레이어가 카드가 소멸하는 원인을 충분히 인지
-	await get_tree().create_timer(exhaust_display_time).timeout
+	# 지정된 노출 시간 동안 대기
+	var wait_time = exhaust_display_time if piece_tag != "" else 0.15
+	await get_tree().create_timer(wait_time).timeout
 	
-	# 3단계: 카드와 전멸 안내 텍스트가 동시에 투명해지며 페이드 아웃
+	# 3단계: 카드와 텍스트가 동시에 투명해지며 페이드 아웃
 	var tween2 = create_tween()
 	tween2.set_parallel(true)
 	tween2.tween_method(func(a: float): card_3d.set_card_alpha(a), 1.0, 0.0, exhaust_fade_time)
-	tween2.tween_property(label, "modulate:a", 0.0, exhaust_fade_time)
+	if is_instance_valid(label):
+		tween2.tween_property(label, "modulate:a", 0.0, exhaust_fade_time)
 	
 	await tween2.finished
-	label.queue_free()
-	card_3d.queue_free()
+	if is_instance_valid(label):
+		label.queue_free()
+	if is_instance_valid(card_3d):
+		card_3d.queue_free()
 
 # 드로우 시각 효과 처리 (위치 이동은 lerp가 전담, 여기서는 회전/크기만)
 func _animate_drawn_card(card_3d: CardVisual3D):
@@ -543,6 +562,24 @@ func _try_play_or_return_card(mouse_pos: Vector2):
 		
 		print("카드 사용됨! : ", data.card_name, " (소모 코스트: ", cost_to_pay, ")")
 		
+		# 전술/스킬/파워 카드 특수 효과 처리
+		var bm = get_tree().get_first_node_in_group("BoardManager")
+		if data.id == "t_crusade":
+			if bm and bm.has_method("add_custom_rule"):
+				bm.add_custom_rule("bishop_straight_move")
+		elif data.id == "t_disband":
+			if bm and bm.has_method("add_friendly_capture_charge"):
+				bm.add_friendly_capture_charge(1)
+		elif data.id == "t_lance_charge":
+			if bm and bm.has_method("activate_lance_charge_pending"):
+				bm.activate_lance_charge_pending()
+		elif data.id == "t_last_stand":
+			if bm and bm.has_method("activate_last_stand"):
+				bm.activate_last_stand()
+		elif data.id == "t_quick_decision":
+			if bm and bm.has_method("apply_quick_decision"):
+				bm.apply_quick_decision()
+
 		# 기물 행동권(토큰) 부여 처리
 		if CardData.CardType.PIECE == data.type or "Piece" in data.tags:
 			var piece_tag = ""
@@ -551,26 +588,28 @@ func _try_play_or_return_card(mouse_pos: Vector2):
 					piece_tag = t
 					break
 			if piece_tag != "":
-				var bm = get_tree().get_first_node_in_group("BoardManager")
 				if bm:
-					bm.add_action_token(piece_tag)
+					if piece_tag == "Knight" and bm.has_method("trigger_lance_charge_on_knight_played") and bm.lance_charge_pending:
+						bm.trigger_lance_charge_on_knight_played()
+					else:
+						bm.add_action_token(piece_tag)
 				else:
 					print("[CardManager] BoardManager를 찾을 수 없어 행동권을 부여하지 못했습니다.")
 		
-		# 사용된 카드를 DeckComponent의 버린 카드 더미로 보냅니다.
-		# 만약 "Exhaust" 태그가 있다면 exhaust_card로 보낼 수 있습니다.
-		if "Exhaust" in data.tags:
+		# 사용된 카드를 DeckComponent의 버린 카드 더미(또는 소멸 더미)로 보냅니다.
+		# "Exhaust" 태그가 있거나 파워 카드(Power)인 경우 화면 중앙 소멸(Exhaust) 시퀀스를 적용합니다.
+		var is_exhaust = ("Exhaust" in data.tags) or ("Power" in data.tags) or (data.type == CardData.CardType.POWER)
+		if is_exhaust:
 			deck_component.exhaust_card(data.id)
-			print(" -> 카드 소멸됨 (Exhaust)")
+			print(" -> 카드 소멸됨 (Power/Exhaust 화면 중앙 소멸 시퀀스 재생)")
+			_animate_exhaust_from_hand(selected_card, "")
 		else:
 			deck_component.discard_card(data.id)
 			print(" -> 버린 카드 더미로 이동")
+			_animate_discard_card(selected_card)
 		
 		hand.erase(data)
 		card_visuals.erase(selected_card)
-		
-		# 즉시 삭제하지 않고 우측 하단으로 빨려 들어가는 애니메이션 재생
-		_animate_discard_card(selected_card)
 		
 		selected_card = null
 		_recalculate_hand_positions()

@@ -117,21 +117,19 @@ func _on_enemy_turn():
 		board_manager.current_valid_moves.clear()
 		board_manager.current_valid_moves.append(best_tile) # Manager 내부 검증 통과용
 		board_manager.attempt_move(best_piece, best_tile)
-		
-		# 행동 횟수 증가 처리 (기물 1회 제한 룰 적용)
-		if best_piece.has_method("record_move"):
-			best_piece.record_move()
 			
 		print("AI 결정 (%d/%d): %s ➔ %s (가치 점수: %d)" % [action_idx + 1, ai_actions_per_turn, best_piece.name, best_tile, round(highest_score)])
 		
-		# 다음 행동을 하기 전에 애니메이션을 볼 수 있도록 약간 대기
-		if action_idx < ai_actions_per_turn - 1:
-			await get_tree().create_timer(0.4).timeout
+		# 다음 행동을 하기 전에 애니메이션 및 결사항전 연출을 볼 수 있도록 대기
+		await get_tree().create_timer(1.0).timeout
 			
 	is_player_turn = true
 	print("AI 턴 종료. 플레이어의 턴입니다.")
 	
-	# 상대방 행동이 모두 끝났으므로 내 턴을 시작합니다.
+	# 상대방 행동(AI 턴)이 모두 끝났으므로 남은 결사항전 함정 수량 리셋 후 플레이어 턴 시작
+	if board_manager and board_manager.has_method("reset_last_stand"):
+		board_manager.reset_last_stand()
+		
 	var cm = get_tree().get_first_node_in_group("CardManager")
 	if cm and cm.has_method("start_turn"):
 		cm.start_turn()

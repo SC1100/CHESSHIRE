@@ -32,6 +32,101 @@ var highlight_nodes: Array[Node] = []
 var current_valid_moves: Array[String] = []
 var highlight_material: StandardMaterial3D
 
+# --- 전투 특수 규칙 (Active Custom Rules) ---
+var active_custom_rules: Array[String] = []
+
+func add_custom_rule(rule_name: String) -> void:
+	if not active_custom_rules.has(rule_name):
+		active_custom_rules.append(rule_name)
+		print("BoardManager: 전투 특수 룰 적용됨 -> ", rule_name)
+
+func remove_custom_rule(rule_name: String) -> void:
+	if active_custom_rules.has(rule_name):
+		active_custom_rules.erase(rule_name)
+		print("BoardManager: 전투 특수 룰 해제됨 -> ", rule_name)
+
+# --- 소집 해제 (Friendly Capture Charge) ---
+var friendly_capture_charges: int = 0
+
+func add_friendly_capture_charge(amount: int = 1) -> void:
+	friendly_capture_charges += amount
+	if friendly_capture_charges > 0:
+		add_custom_rule("allow_friendly_capture")
+	print("BoardManager: 아군 포획 기능 충전됨! (남은 횟수: %d)" % friendly_capture_charges)
+
+func consume_friendly_capture_charge() -> void:
+	if friendly_capture_charges > 0:
+		friendly_capture_charges -= 1
+		print("BoardManager: 아군 포획 기능 1회 차감됨 (남은 횟수: %d)" % friendly_capture_charges)
+		if friendly_capture_charges <= 0:
+			remove_custom_rule("allow_friendly_capture")
+
+# --- 랜스 차징 (Lance Charge) ---
+var lance_charge_pending: bool = false
+var lance_charge_target_knight: Node = null
+var lance_charge_moves_left: int = 0
+
+func activate_lance_charge_pending() -> void:
+	lance_charge_pending = true
+	print("BoardManager: [랜스 차징] 대기 상태! 다음 나이트 카드 사용 시 행동권 +2 및 2회 연속 이동 부여")
+
+func trigger_lance_charge_on_knight_played() -> bool:
+	if lance_charge_pending:
+		lance_charge_pending = false
+		lance_charge_moves_left = 2
+		add_custom_rule("knight_no_jump")
+		add_action_token("Knight", 2)
+		print("BoardManager: [랜스 차징] 발동! 나이트 행동권 +2개 부여됨 (점프 불가)")
+		return true
+	return false
+
+func reset_lance_charge() -> void:
+	lance_charge_pending = false
+	if is_instance_valid(lance_charge_target_knight):
+		if "max_moves" in lance_charge_target_knight:
+			lance_charge_target_knight.max_moves = 1
+	lance_charge_target_knight = null
+	lance_charge_moves_left = 0
+	remove_custom_rule("knight_no_jump")
+	print("BoardManager: 랜스 차징 효과가 초기화/해제되었습니다.")
+
+# --- 결사항전 (Last Stand) ---
+var last_stand_charges: int = 0
+
+func activate_last_stand() -> void:
+	last_stand_charges = 1
+	print("BoardManager: [결사항전] 반격 함정 발동! 다음 상대 턴 아군 기물 공격 시 동귀어진")
+
+func reset_last_stand() -> void:
+	if last_stand_charges > 0:
+		last_stand_charges = 0
+		print("BoardManager: 결사항전 효과가 종료되었습니다.")
+
+# --- 빠른 판단 (Quick Decision) ---
+func apply_quick_decision() -> void:
+	var king_piece: Node = null
+	for tile_name in current_board_state:
+		var piece = current_board_state[tile_name]
+		if is_instance_valid(piece) and is_player_piece(piece):
+			if piece.is_in_group("Objective") or "King" in piece.name:
+				king_piece = piece
+				break
+				
+	if is_instance_valid(king_piece):
+		if "move_count" in king_piece and king_piece.move_count >= 1:
+			king_piece.move_count -= 1
+			print("BoardManager: [빠른 판단] 킹 이동 횟수 1회 차감 (현재 move_count: %d) 및 행동권 +1 부여" % king_piece.move_count)
+		else:
+			print("BoardManager: [빠른 판단] 킹 미이동 상태 -> 행동권 +1만 부여")
+			
+	add_action_token("King", 1)
+
+func clear_custom_rules() -> void:
+	active_custom_rules.clear()
+	friendly_capture_charges = 0
+	reset_lance_charge()
+	reset_last_stand()
+
 # --- Player Team Control ---
 @export var player_team: PieceData.Team = PieceData.Team.WHITE
 
@@ -221,6 +316,11 @@ func get_tile_of_piece(piece: Node) -> String:
 func show_valid_moves(piece: Node) -> void:
 	clear_valid_moves() # 기존 하이라이트 지우기
 	
+	# 랜스 차징 대상 나이트가 지정된 경우 다른 기물 조작 차단
+	if is_instance_valid(lance_charge_target_knight) and piece != lance_charge_target_knight:
+		print("BoardManager: 랜스 차징 2회 이동 중에는 지정된 나이트만 조작 가능합니다!")
+		return
+		
 	var piece_tile = get_tile_of_piece(piece)
 	if piece_tile == "": return
 	
@@ -228,7 +328,7 @@ func show_valid_moves(piece: Node) -> void:
 	for col in cols:
 		for row in range(1, 9):
 			var target_tile = col + str(row)
-			if ChessRules.is_move_valid(piece.name, piece_tile, target_tile, current_board_state):
+			if ChessRules.is_move_valid(piece.name, piece_tile, target_tile, current_board_state, active_custom_rules):
 				current_valid_moves.append(target_tile)
 				_create_highlight_on_tile(target_tile)
 
@@ -279,6 +379,8 @@ func attempt_move(piece: Node, target_tile_name: String) -> bool:
 	# 1. 적 기물 포획 처리
 	var is_victory_captured: bool = false
 	var is_defeat_captured: bool = false
+	var is_last_stand_counter: bool = false
+
 	if current_board_state.has(target_tile_name):
 		var target_piece = current_board_state[target_tile_name]
 		if is_instance_valid(target_piece) and target_piece != piece:
@@ -289,15 +391,27 @@ func attempt_move(piece: Node, target_tile_name: String) -> bool:
 				else:
 					is_defeat_captured = true
 			
-			# 아군 기물이 잡힌 경우 전멸 상태 검사 및 등록
+			# 아군 기물이 잡힌 경우 전멸 상태 검사 및 차감 처리
 			if is_player_piece(target_piece):
 				_check_and_register_eliminated_piece_type(target_piece)
+				consume_friendly_capture_charge()
+				
+				# [결사항전] 적 기물이 아군 기물을 공격했을 때 반격 파괴 (킹 포함 예외 없음)
+				if not is_player_piece(piece) and last_stand_charges > 0:
+					last_stand_charges -= 1
+					is_last_stand_counter = true
+					print("BoardManager: [ 결사항전 ] 발동! 아군을 공격한 적 기물(%s)도 함께 동귀어진 파괴됩니다." % piece.name)
+					
+					# 적 공격 기물이 킹/Objective면 victory 처리!
+					if piece.is_in_group("Objective") or "King" in piece.name:
+						is_victory_captured = true
 
 			target_piece.queue_free()
 			
 	# 2. 데이터 업데이트
 	current_board_state.erase(start_tile)
-	current_board_state[target_tile_name] = piece
+	if not is_last_stand_counter:
+		current_board_state[target_tile_name] = piece
 	
 	# 이동 시 하이라이트 지우기
 	clear_valid_moves()
@@ -352,6 +466,32 @@ func attempt_move(piece: Node, target_tile_name: String) -> bool:
 		if rook_target_tile_node:
 			tween.tween_property(rook_to_move, "global_position", rook_target_tile_node.global_position, 0.3)
 	
+	# 결사항전 발동 시 적 기물 슬라이드 완료 후 0.4초 대기 후 동귀어진 파괴 처리
+	if is_last_stand_counter:
+		tween.finished.connect(func():
+			await get_tree().create_timer(0.4).timeout
+			if is_instance_valid(piece):
+				piece.queue_free()
+		)
+	
+	# 랜스 차징(Lance Charge) 횟수 및 행동권 제어
+	if lance_charge_moves_left > 0:
+		if "Knight" in piece.name:
+			if lance_charge_target_knight == null:
+				lance_charge_target_knight = piece
+				if "max_moves" in piece:
+					piece.max_moves = 2
+				print("BoardManager: 랜스 차징 대상 나이트 지정됨 -> ", piece.name)
+			
+			if piece == lance_charge_target_knight:
+				lance_charge_moves_left -= 1
+				print("BoardManager: 랜스 차징 차감 (남은 차징 횟수: %d)" % lance_charge_moves_left)
+				if lance_charge_moves_left <= 0:
+					reset_lance_charge()
+		else:
+			# 나이트가 아닌 다른 기물을 움직였을 경우 차징 취소
+			reset_lance_charge()
+
 	if is_victory_captured:
 		tween.finished.connect(trigger_victory)
 	elif is_defeat_captured:

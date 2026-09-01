@@ -46,6 +46,7 @@ static func load_data() -> PlayerData:
 		"w_bishop",
 		"w_rook",
 		"w_queen",
-		"w_king"
+		"w_king",
+		"t_quick_decision"
 	])
 	return new_data
