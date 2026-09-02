@@ -99,3 +99,9 @@
 ### 버전 관리
 - **Git**
 - **GitHub**
+
+---
+
+## Credit
+
+- "Chess Board" (https://skfb.ly/6BDGq) by Yanez Designs is licensed under Creative Commons Attribution (http://creativecommons.org/licenses/by/4.0/).
