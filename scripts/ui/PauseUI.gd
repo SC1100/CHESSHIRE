@@ -86,11 +86,40 @@ func _build_ui() -> void:
 func _create_styled_button(btn_text: String, sub_text: String) -> Button:
 	var btn = Button.new()
 	btn.text = "%s  (%s)" % [btn_text, sub_text]
-	btn.custom_minimum_size = Vector2(280, 50)
+	btn.custom_minimum_size = Vector2(300, 52)
 	btn.add_theme_font_size_override("font_size", 18)
-	btn.pivot_offset = Vector2(140, 25)
+	btn.pivot_offset = Vector2(150, 26)
 	
-	# 호버 애니메이션 효과
+	# Normal State
+	var style_normal = StyleBoxFlat.new()
+	style_normal.bg_color = Color(0.10, 0.12, 0.18, 0.88)
+	style_normal.set_corner_radius_all(10)
+	style_normal.set_border_width_all(2)
+	style_normal.border_color = Color(0.92, 0.92, 0.96, 0.9)
+	style_normal.shadow_color = Color(0.0, 0.0, 0.0, 0.5)
+	style_normal.shadow_size = 6
+	btn.add_theme_stylebox_override("normal", style_normal)
+	
+	# Hover State
+	var style_hover = style_normal.duplicate()
+	style_hover.bg_color = Color(0.20, 0.23, 0.33, 0.95)
+	style_hover.border_color = Color(1.0, 1.0, 1.0, 1.0)
+	style_hover.shadow_size = 10
+	btn.add_theme_stylebox_override("hover", style_hover)
+	
+	# Pressed State
+	var style_pressed = style_normal.duplicate()
+	style_pressed.bg_color = Color(0.06, 0.08, 0.14, 0.95)
+	style_pressed.border_color = Color(0.75, 0.75, 0.8, 0.8)
+	btn.add_theme_stylebox_override("pressed", style_pressed)
+	
+	# Font Outlines & Colors
+	btn.add_theme_color_override("font_color", Color.WHITE)
+	btn.add_theme_color_override("font_hover_color", Color(1.0, 0.92, 0.5))
+	btn.add_theme_color_override("font_outline_color", Color.BLACK)
+	btn.add_theme_constant_override("outline_size", 5)
+	
+	# 호버 애니메이션 효과 (1.05배 부드럽게 확대)
 	btn.mouse_entered.connect(func():
 		var tween = btn.create_tween()
 		tween.tween_property(btn, "scale", Vector2(1.05, 1.05), 0.1).set_trans(Tween.TRANS_QUAD)

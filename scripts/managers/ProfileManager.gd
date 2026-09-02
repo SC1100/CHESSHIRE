@@ -65,7 +65,6 @@ func create_default_profile(nickname: String) -> Dictionary:
 				"w_knight", "w_bishop", "w_rook", "w_queen", "w_king",
 				"t_lance_charge"
 			],
-			"hp": 100,
 			"stage_snapshot": {}
 		}
 	}
@@ -91,8 +90,9 @@ func has_active_run() -> bool:
 		return profile_data["current_run"].get("is_in_run", false) == true
 	return false
 
-func start_new_run() -> void:
-	print("ProfileManager: 신규 런을 시작합니다. (런 데이터 초기화)")
+# 1. 새 게임 클릭 시 런 준비 (is_in_run = false 상태로 덱 초기화)
+func init_new_run() -> void:
+	print("ProfileManager: 신규 런 데이터가 준비되었습니다. (실제 스테이지 진입 전 대기)")
 	var default_deck = [
 		"w_king", "w_queen", "w_rook", "w_knight", "w_bishop",
 		"w_pawn", "w_pawn", "w_pawn",
@@ -100,17 +100,30 @@ func start_new_run() -> void:
 	]
 	
 	profile_data["current_run"] = {
-		"is_in_run": true,
+		"is_in_run": false,
 		"current_stage_id": "stage1",
 		"master_deck": default_deck,
-		"hp": 100,
 		"stage_snapshot": {}
 	}
+	save_profile()
+
+func start_new_run() -> void:
+	init_new_run()
+
+# 2. 플레이어가 실제로 스테이지 버튼을 클릭해 전투에 진입할 때 런 시작 확정
+func start_active_run(stage_id: String = "stage1") -> void:
+	if not profile_data.has("current_run") or profile_data["current_run"].is_empty():
+		init_new_run()
+		
+	var is_already_in_run = profile_data["current_run"].get("is_in_run", false)
+	profile_data["current_run"]["is_in_run"] = true
+	profile_data["current_run"]["current_stage_id"] = stage_id
 	
-	if profile_data.has("permanent_data"):
+	if not is_already_in_run and profile_data.has("permanent_data"):
 		profile_data["permanent_data"]["total_runs"] = profile_data["permanent_data"].get("total_runs", 0) + 1
 		
 	save_profile()
+	print("ProfileManager: [%s] 스테이지 전투 진입으로 런 시작이 확정되었습니다!" % stage_id)
 
 func clear_current_run() -> void:
 	print("ProfileManager: 런이 종료되었습니다. (휘발성 런 데이터 소멸)")

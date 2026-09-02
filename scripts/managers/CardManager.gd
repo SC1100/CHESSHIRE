@@ -112,22 +112,25 @@ func _setup_test_ui():
 	
 	var draw_btn = Button.new()
 	draw_btn.text = "1장 드로우 (테스트)"
-	draw_btn.custom_minimum_size = Vector2(200, 60)
-	draw_btn.add_theme_font_size_override("font_size", 20)
+	draw_btn.custom_minimum_size = Vector2(200, 52)
+	draw_btn.add_theme_font_size_override("font_size", 18)
+	_apply_hud_button_style(draw_btn, false)
 	draw_btn.pressed.connect(func(): execute_drawing(1))
 	vbox.add_child(draw_btn)
 	
 	var start_btn = Button.new()
 	start_btn.text = "내 턴 시작 (테스트)"
-	start_btn.custom_minimum_size = Vector2(200, 60)
-	start_btn.add_theme_font_size_override("font_size", 20)
+	start_btn.custom_minimum_size = Vector2(200, 52)
+	start_btn.add_theme_font_size_override("font_size", 18)
+	_apply_hud_button_style(start_btn, false)
 	start_btn.pressed.connect(func(): start_turn())
 	vbox.add_child(start_btn)
 	
 	var end_btn = Button.new()
 	end_btn.text = "턴 종료 [Space]"
-	end_btn.custom_minimum_size = Vector2(200, 60)
+	end_btn.custom_minimum_size = Vector2(200, 56)
 	end_btn.add_theme_font_size_override("font_size", 20)
+	_apply_hud_button_style(end_btn, true) # 턴 종료 버튼 강조
 	end_btn.pressed.connect(func(): end_turn())
 	vbox.add_child(end_btn)
 
@@ -160,13 +163,19 @@ func end_turn():
 		return
 	print("내 턴 종료! 남은 손패를 모두 버립니다.")
 	
-	# 턴 종료 시 턴 제한 전술 카드 효과 초기화
+	# 턴 종료 시 남아있는 모든 기물 행동권(토큰) 및 턴 제한 전술 카드 효과 즉시 초기화
 	var bm = get_tree().get_first_node_in_group("BoardManager")
 	if bm:
+		bm.reset_all_action_tokens() # 모든 기물 행동권 토큰 0으로 즉시 소멸
 		if bm.has_method("reset_friendly_capture_charges"):
 			bm.reset_friendly_capture_charges()
 		if bm.has_method("reset_lance_charge"):
 			bm.reset_lance_charge()
+			
+	# 보드판 입력 및 기물 아웃라인 선택 상태 즉시 해제
+	var board_input = get_tree().root.find_child("BoardInput", true, false)
+	if board_input and board_input.has_method("clear_selection"):
+		board_input.clear_selection()
 	
 	# 루프 중 원본 배열을 삭제하는 오류를 막기 위해 손패를 복제해서 사용
 	var cards_to_discard = hand.duplicate()
@@ -725,14 +734,17 @@ func execute_card_view(pile_cards: Array[String], title: String, sort_by_cost: b
 	
 	# 어두운 배경 필터 (블랙 반투명)
 	var bg = ColorRect.new()
-	bg.color = Color(0, 0, 0, 0.8)
+	bg.color = Color(0, 0, 0, 0.85)
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	viewer_canvas.add_child(bg)
 	
 	# 상단 제목 라벨
 	var title_label = Label.new()
 	title_label.text = title + " (" + str(pile_cards.size()) + "장)"
-	title_label.add_theme_font_size_override("font_size", 40)
+	title_label.add_theme_font_size_override("font_size", 38)
+	title_label.add_theme_color_override("font_color", Color.WHITE)
+	title_label.add_theme_color_override("font_outline_color", Color.BLACK)
+	title_label.add_theme_constant_override("outline_size", 8)
 	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title_label.set_anchors_preset(Control.PRESET_TOP_WIDE)
 	title_label.position.y = 30
@@ -741,20 +753,24 @@ func execute_card_view(pile_cards: Array[String], title: String, sort_by_cost: b
 	# 스크롤 가능한 영역 생성
 	var scroll = ScrollContainer.new()
 	scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
-	scroll.offset_left = 100
-	scroll.offset_right = -100
-	scroll.offset_top = 100
-	scroll.offset_bottom = -120
+	scroll.offset_left = 60
+	scroll.offset_right = -60
+	scroll.offset_top = 90
+	scroll.offset_bottom = -100
 	viewer_canvas.add_child(scroll)
+	
+	# 중앙 정렬 컨테이너 (카드가 화면 중앙에 예쁘게 모이도록 보정)
+	var center_box = CenterContainer.new()
+	center_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	center_box.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.add_child(center_box)
 	
 	# 가로 5칸짜리 그리드 (바둑판) 생성
 	var grid = GridContainer.new()
 	grid.columns = 5
-	grid.add_theme_constant_override("h_separation", 20)
-	grid.add_theme_constant_override("v_separation", 20)
-	# 스크롤 영역 내부 정렬
-	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	scroll.add_child(grid)
+	grid.add_theme_constant_override("h_separation", 24)
+	grid.add_theme_constant_override("v_separation", 24)
+	center_box.add_child(grid)
 	
 	# 원본 덱 배열(순서)을 건드리지 않기 위해 복제본 생성
 	var sorted_cards = pile_cards.duplicate()
@@ -776,11 +792,30 @@ func execute_card_view(pile_cards: Array[String], title: String, sort_by_cost: b
 	for card_id in sorted_cards:
 		var data = CardData.get_card(card_id)
 		if data:
+			# 호버 애니메이션 피벗을 가진 컨테이너 래퍼
+			var card_wrapper = Control.new()
+			card_wrapper.custom_minimum_size = Vector2(180, 270) # 정확한 2:3 비율 (손패 및 800x1200 표준 동기화)
+			
 			var tex_rect = TextureRect.new()
 			tex_rect.texture = data.get_texture()
-			tex_rect.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
-			tex_rect.custom_minimum_size = Vector2(180, 245)
-			grid.add_child(tex_rect)
+			tex_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			tex_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			tex_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
+			tex_rect.pivot_offset = Vector2(90, 135) # 카드 중앙 피벗
+			card_wrapper.add_child(tex_rect)
+			
+			# 마우스 호버 효과 (마우스 올릴 시 1.18배 선명 확대)
+			tex_rect.mouse_filter = Control.MOUSE_FILTER_STOP
+			tex_rect.mouse_entered.connect(func():
+				var tween = tex_rect.create_tween()
+				tween.tween_property(tex_rect, "scale", Vector2(1.2, 1.2), 0.12).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+			)
+			tex_rect.mouse_exited.connect(func():
+				var tween = tex_rect.create_tween()
+				tween.tween_property(tex_rect, "scale", Vector2.ONE, 0.12).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+			)
+			
+			grid.add_child(card_wrapper)
 			
 	# 배경(ColorRect) 클릭 시 닫기
 	bg.gui_input.connect(func(event: InputEvent):
@@ -791,15 +826,53 @@ func execute_card_view(pile_cards: Array[String], title: String, sort_by_cost: b
 	
 	# 닫기 버튼 명시적 제공
 	var close_btn = Button.new()
-	close_btn.text = "닫기 (또는 어두운 배경 클릭)"
-	close_btn.add_theme_font_size_override("font_size", 24)
+	close_btn.text = "닫기"
+	close_btn.add_theme_font_size_override("font_size", 22)
 	close_btn.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-	close_btn.offset_left = 300
-	close_btn.offset_right = -300
-	close_btn.offset_top = -80
+	close_btn.offset_left = 360
+	close_btn.offset_right = -360
+	close_btn.offset_top = -75
 	close_btn.offset_bottom = -20
+	_apply_hud_button_style(close_btn, false)
 	close_btn.pressed.connect(func():
 		viewer_canvas.queue_free()
 		current_state = State.IDLE
 	)
 	viewer_canvas.add_child(close_btn)
+
+func _apply_hud_button_style(btn: Button, is_highlight: bool = false) -> void:
+	if not btn: return
+	
+	# Normal State
+	var style_normal = StyleBoxFlat.new()
+	if is_highlight:
+		style_normal.bg_color = Color(0.18, 0.13, 0.08, 0.92) # 턴 종료 버튼 전용 골드 틴트
+		style_normal.border_color = Color(1.0, 0.88, 0.45, 0.95) # 선명한 골드 테두리
+	else:
+		style_normal.bg_color = Color(0.10, 0.12, 0.18, 0.88)
+		style_normal.border_color = Color(0.92, 0.92, 0.96, 0.9)
+		
+	style_normal.set_corner_radius_all(10)
+	style_normal.set_border_width_all(2)
+	style_normal.shadow_color = Color(0.0, 0.0, 0.0, 0.5)
+	style_normal.shadow_size = 6
+	btn.add_theme_stylebox_override("normal", style_normal)
+	
+	# Hover State
+	var style_hover = style_normal.duplicate()
+	style_hover.bg_color = Color(0.24, 0.27, 0.38, 0.95)
+	style_hover.border_color = Color(1.0, 1.0, 1.0, 1.0)
+	style_hover.shadow_size = 10
+	btn.add_theme_stylebox_override("hover", style_hover)
+	
+	# Pressed State
+	var style_pressed = style_normal.duplicate()
+	style_pressed.bg_color = Color(0.06, 0.08, 0.14, 0.95)
+	style_pressed.border_color = Color(0.75, 0.75, 0.8, 0.8)
+	btn.add_theme_stylebox_override("pressed", style_pressed)
+	
+	# Font Outlines & Colors
+	btn.add_theme_color_override("font_color", Color.WHITE)
+	btn.add_theme_color_override("font_hover_color", Color(1.0, 0.92, 0.5))
+	btn.add_theme_color_override("font_outline_color", Color.BLACK)
+	btn.add_theme_constant_override("outline_size", 5)

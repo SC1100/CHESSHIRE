@@ -7,6 +7,8 @@ class_name TitleManager
 @onready var quit_button: Button = %QuitButton
 
 func _ready() -> void:
+	_apply_title_button_styles()
+	
 	if new_game_button:
 		new_game_button.pressed.connect(_on_new_game_pressed)
 	if continue_button:
@@ -21,9 +23,52 @@ func _ready() -> void:
 	if quit_button:
 		quit_button.pressed.connect(_on_quit_pressed)
 
+func _apply_title_button_styles() -> void:
+	var buttons = [new_game_button, continue_button, option_button, quit_button]
+	for btn in buttons:
+		if not btn: continue
+		
+		# Normal State
+		var style_normal = StyleBoxFlat.new()
+		style_normal.bg_color = Color(0.10, 0.12, 0.18, 0.88)
+		style_normal.set_corner_radius_all(10)
+		style_normal.set_border_width_all(2)
+		style_normal.border_color = Color(0.92, 0.92, 0.96, 0.9)
+		style_normal.shadow_color = Color(0.0, 0.0, 0.0, 0.5)
+		style_normal.shadow_size = 6
+		btn.add_theme_stylebox_override("normal", style_normal)
+		
+		# Hover State
+		var style_hover = style_normal.duplicate()
+		style_hover.bg_color = Color(0.20, 0.23, 0.33, 0.95)
+		style_hover.border_color = Color(1.0, 1.0, 1.0, 1.0)
+		style_hover.shadow_size = 10
+		btn.add_theme_stylebox_override("hover", style_hover)
+		
+		# Pressed State
+		var style_pressed = style_normal.duplicate()
+		style_pressed.bg_color = Color(0.06, 0.08, 0.14, 0.95)
+		style_pressed.border_color = Color(0.75, 0.75, 0.8, 0.8)
+		btn.add_theme_stylebox_override("pressed", style_pressed)
+		
+		# Disabled State
+		var style_disabled = StyleBoxFlat.new()
+		style_disabled.bg_color = Color(0.08, 0.08, 0.1, 0.5)
+		style_disabled.set_corner_radius_all(10)
+		style_disabled.set_border_width_all(1)
+		style_disabled.border_color = Color(0.35, 0.35, 0.4, 0.4)
+		btn.add_theme_stylebox_override("disabled", style_disabled)
+		
+		# Font Outlines & Colors
+		btn.add_theme_color_override("font_color", Color.WHITE)
+		btn.add_theme_color_override("font_hover_color", Color(1.0, 0.92, 0.5))
+		btn.add_theme_color_override("font_disabled_color", Color(0.5, 0.5, 0.5, 0.5))
+		btn.add_theme_color_override("font_outline_color", Color.BLACK)
+		btn.add_theme_constant_override("outline_size", 5)
+
 func _on_new_game_pressed() -> void:
-	# 새 게임 시작 시 이전 런 데이터 리셋 및 신규 런 시작
-	ProfileManager.start_new_run()
+	# 새 게임 클릭 시 런 정보 초기화 준비 (실제 스테이지 진입 전까지는 is_in_run = false)
+	ProfileManager.init_new_run()
 	get_tree().change_scene_to_file("res://Scene/Stage.tscn")
 
 func _on_continue_pressed() -> void:

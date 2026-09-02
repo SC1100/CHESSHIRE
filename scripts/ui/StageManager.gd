@@ -7,6 +7,8 @@ class_name StageManager
 @onready var back_button: Button = %BackButton
 
 func _ready() -> void:
+	_apply_stage_button_styles()
+	
 	if stage_1_button:
 		stage_1_button.pressed.connect(_on_stage_1_pressed)
 	if stage_2_button:
@@ -15,6 +17,66 @@ func _ready() -> void:
 		stage_3_button.pressed.connect(_on_stage_3_pressed)
 	if back_button:
 		back_button.pressed.connect(_on_back_pressed)
+
+func _apply_stage_button_styles() -> void:
+	var stage_buttons = [stage_1_button, stage_2_button, stage_3_button]
+	for btn in stage_buttons:
+		if not btn: continue
+		
+		# Normal State (스테이지 카드는 굵은 흰색 테두리 3px, 모서리 14px)
+		var style_normal = StyleBoxFlat.new()
+		style_normal.bg_color = Color(0.10, 0.12, 0.18, 0.88)
+		style_normal.set_corner_radius_all(14)
+		style_normal.set_border_width_all(3)
+		style_normal.border_color = Color(0.92, 0.92, 0.96, 0.95)
+		style_normal.shadow_color = Color(0.0, 0.0, 0.0, 0.5)
+		style_normal.shadow_size = 10
+		btn.add_theme_stylebox_override("normal", style_normal)
+		
+		# Hover State
+		var style_hover = style_normal.duplicate()
+		style_hover.bg_color = Color(0.20, 0.23, 0.35, 0.95)
+		style_hover.border_color = Color(1.0, 0.92, 0.45, 1.0) # 마우스 호버 시 골드/화이트 강조
+		style_hover.shadow_size = 16
+		btn.add_theme_stylebox_override("hover", style_hover)
+		
+		# Pressed State
+		var style_pressed = style_normal.duplicate()
+		style_pressed.bg_color = Color(0.06, 0.08, 0.14, 0.95)
+		style_pressed.border_color = Color(0.75, 0.75, 0.8, 0.8)
+		btn.add_theme_stylebox_override("pressed", style_pressed)
+		
+		# Font Outlines & Colors
+		btn.add_theme_color_override("font_color", Color.WHITE)
+		btn.add_theme_color_override("font_hover_color", Color(1.0, 0.95, 0.6))
+		btn.add_theme_color_override("font_outline_color", Color.BLACK)
+		btn.add_theme_constant_override("outline_size", 6)
+
+	if back_button:
+		# 뒤로가기 버튼 전용 스타일 (모서리 10px, 테두리 2px)
+		var style_back = StyleBoxFlat.new()
+		style_back.bg_color = Color(0.12, 0.14, 0.20, 0.88)
+		style_back.set_corner_radius_all(10)
+		style_back.set_border_width_all(2)
+		style_back.border_color = Color(0.92, 0.92, 0.96, 0.9)
+		style_back.shadow_color = Color(0.0, 0.0, 0.0, 0.5)
+		style_back.shadow_size = 6
+		back_button.add_theme_stylebox_override("normal", style_back)
+		
+		var style_back_hover = style_back.duplicate()
+		style_back_hover.bg_color = Color(0.22, 0.25, 0.35, 0.95)
+		style_back_hover.border_color = Color(1.0, 1.0, 1.0, 1.0)
+		style_back_hover.shadow_size = 10
+		back_button.add_theme_stylebox_override("hover", style_back_hover)
+		
+		var style_back_pressed = style_back.duplicate()
+		style_back_pressed.bg_color = Color(0.08, 0.10, 0.16, 0.95)
+		back_button.add_theme_stylebox_override("pressed", style_back_pressed)
+		
+		back_button.add_theme_color_override("font_color", Color.WHITE)
+		back_button.add_theme_color_override("font_hover_color", Color(1.0, 0.92, 0.5))
+		back_button.add_theme_color_override("font_outline_color", Color.BLACK)
+		back_button.add_theme_constant_override("outline_size", 4)
 
 func _on_back_pressed() -> void:
 	get_tree().change_scene_to_file("res://Scene/TitleScene.tscn")
@@ -36,6 +98,10 @@ func _on_stage_3_pressed() -> void:
 func _transition_to_battle(stage_id: String) -> void:
 	BoardManager.current_stage_id = stage_id
 	
+	# 플레이어가 실제로 스테이지 버튼을 눌러 전투 진입 시 런 공식 시작 확정!
+	if ProfileManager.has_method("start_active_run"):
+		ProfileManager.start_active_run(stage_id)
+		
 	# 중복 클릭 방지
 	if stage_1_button: stage_1_button.disabled = true
 	if stage_2_button: stage_2_button.disabled = true

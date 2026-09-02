@@ -650,6 +650,12 @@ func trigger_defeat() -> void:
 	is_game_over = true
 	print("☠ [DEFEATED] 패배하였습니다... ☠")
 	
+	# 패배 시 현재 런 공식 종료 (휘발성 런 저장 데이터 소멸)
+	var pm = get_tree().get_first_node_in_group("ProfileManager")
+	if not pm: pm = ProfileManager
+	if pm and pm.has_method("clear_current_run"):
+		pm.clear_current_run()
+	
 	var canvas = CanvasLayer.new()
 	canvas.layer = 90
 	add_child(canvas)

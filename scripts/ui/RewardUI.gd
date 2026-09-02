@@ -255,25 +255,32 @@ func _on_remove_card_pressed():
 	pop_bg.color = Color(0, 0, 0, 0.88)
 	pop_canvas.add_child(pop_bg)
 
-	var center_pop = CenterContainer.new()
-	center_pop.set_anchors_preset(Control.PRESET_FULL_RECT)
-	pop_canvas.add_child(center_pop)
+	var main_panel = Control.new()
+	main_panel.set_anchors_preset(Control.PRESET_CENTER)
+	main_panel.custom_minimum_size = Vector2(1180, 820)
+	main_panel.offset_left = -590
+	main_panel.offset_right = 590
+	main_panel.offset_top = -400 # 화면 위쪽으로 더 살짝 올려 시원하게 배치
+	main_panel.offset_bottom = 370
+	pop_canvas.add_child(main_panel)
 
 	var pop_vbox = VBoxContainer.new()
-	pop_vbox.custom_minimum_size = Vector2(960, 560)
+	pop_vbox.set_anchors_preset(Control.PRESET_FULL_RECT)
 	pop_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	pop_vbox.add_theme_constant_override("separation", 16)
-	center_pop.add_child(pop_vbox)
+	pop_vbox.add_theme_constant_override("separation", 18)
+	main_panel.add_child(pop_vbox)
 
 	var p_title = Label.new()
 	p_title.text = "덱에서 삭제할 카드를 선택하세요"
-	p_title.add_theme_font_size_override("font_size", 32)
+	p_title.add_theme_font_size_override("font_size", 34)
 	p_title.add_theme_color_override("font_color", Color(1.0, 0.5, 0.5))
+	p_title.add_theme_color_override("font_outline_color", Color.BLACK)
+	p_title.add_theme_constant_override("outline_size", 8)
 	p_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	pop_vbox.add_child(p_title)
 
 	var scroll = ScrollContainer.new()
-	scroll.custom_minimum_size = Vector2(920, 420)
+	scroll.custom_minimum_size = Vector2(1140, 670) # 위아래 세로 공간 시원하게 확장 (기존 420px -> 670px)
 	pop_vbox.add_child(scroll)
 
 	var grid_center = CenterContainer.new()
@@ -282,8 +289,8 @@ func _on_remove_card_pressed():
 
 	var grid = GridContainer.new()
 	grid.columns = 5
-	grid.add_theme_constant_override("h_separation", 16)
-	grid.add_theme_constant_override("v_separation", 16)
+	grid.add_theme_constant_override("h_separation", 20)
+	grid.add_theme_constant_override("v_separation", 20)
 	grid_center.add_child(grid)
 
 	for c_id in current_deck:
@@ -292,8 +299,8 @@ func _on_remove_card_pressed():
 
 	var cancel_btn = Button.new()
 	cancel_btn.text = "닫기"
-	cancel_btn.custom_minimum_size = Vector2(140, 45)
-	cancel_btn.add_theme_font_size_override("font_size", 18)
+	cancel_btn.custom_minimum_size = Vector2(180, 50)
+	cancel_btn.add_theme_font_size_override("font_size", 20)
 	cancel_btn.pressed.connect(func(): pop_canvas.queue_free())
 	pop_vbox.add_child(cancel_btn)
 
@@ -301,13 +308,28 @@ func _create_removal_card_panel(card_id: String, pm: Node, pop_canvas: CanvasLay
 	var data = CardData.database.get(card_id, null)
 	var card_name = data.card_name if data else card_id
 
+	# 레이아웃 간격 유지를 위한 래퍼 컨테이너
+	var wrapper = Control.new()
+	wrapper.custom_minimum_size = Vector2(160, 220)
+
 	var btn = TextureButton.new()
-	btn.custom_minimum_size = Vector2(160, 220)
+	btn.set_anchors_preset(Control.PRESET_FULL_RECT)
 	btn.ignore_texture_size = true
 	btn.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
+	btn.pivot_offset = Vector2(80, 110) # 카드 중앙 피벗
 
 	if data and ResourceLoader.exists(data.image_path):
 		btn.texture_normal = data.get_texture()
+
+	# 마우스 호버 확대 애니메이션 (부드럽게 1.18배 확대)
+	btn.mouse_entered.connect(func():
+		var tw = create_tween()
+		tw.tween_property(btn, "scale", Vector2(1.2, 1.2), 0.12).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	)
+	btn.mouse_exited.connect(func():
+		var tw = create_tween()
+		tw.tween_property(btn, "scale", Vector2.ONE, 0.12).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	)
 
 	# 카드 클릭 시 삭제 처리
 	btn.pressed.connect(func():
@@ -318,7 +340,8 @@ func _create_removal_card_panel(card_id: String, pm: Node, pop_canvas: CanvasLay
 		pop_canvas.queue_free()
 	)
 
-	return btn
+	wrapper.add_child(btn)
+	return wrapper
 
 # --- 3스테이지 완료 후 현재 덱을 유지한 채 1스테이지로 재도전 (회차 플레이) ---
 func _on_restart_with_current_deck_pressed():

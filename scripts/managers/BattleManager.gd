@@ -33,9 +33,9 @@ func _ready():
 		chess_env.background_color = Color(0.7, 0.7, 0.7) # 밝은 회색
 		chess_camera.environment = chess_env
 	
-	# 2. UI 레이어 및 서브뷰포트 생성 (카드를 투명하게 띄우기 위함)
+	# 2. UI 레이어 및 서브뷰포트 생성 (기본 게임 UI 레이어 1 지정)
 	var canvas_layer = CanvasLayer.new()
-	canvas_layer.layer = 10 # 가장 앞에 보이도록 설정
+	canvas_layer.layer = 1 # 기본 게임 HUD/카드 UI 레이어 (모달 뷰어 layer=10보다 아래)
 	add_child(canvas_layer)
 	
 	var sv_container = SubViewportContainer.new()

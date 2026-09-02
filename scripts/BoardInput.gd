@@ -192,3 +192,11 @@ func _set_piece_outline(piece: Node, enable: bool) -> void:
 			else:
 				child.material_overlay = null
 			break
+
+func clear_selection() -> void:
+	if is_instance_valid(selected_piece):
+		_set_piece_outline(selected_piece, false)
+	selected_piece = null
+	var bm = get_node_or_null("../BoardManager")
+	if bm and bm.has_method("clear_valid_moves"):
+		bm.clear_valid_moves()
