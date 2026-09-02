@@ -100,6 +100,7 @@ func _transition_to_battle(stage_id: String) -> void:
 	
 	# 플레이어가 실제로 스테이지 버튼을 눌러 전투 진입 시 런 공식 시작 확정!
 	if ProfileManager.has_method("start_active_run"):
+		ProfileManager.init_new_run()
 		ProfileManager.start_active_run(stage_id)
 		
 	# 중복 클릭 방지

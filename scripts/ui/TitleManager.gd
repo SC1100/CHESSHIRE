@@ -67,8 +67,7 @@ func _apply_title_button_styles() -> void:
 		btn.add_theme_constant_override("outline_size", 5)
 
 func _on_new_game_pressed() -> void:
-	# 새 게임 클릭 시 런 정보 초기화 준비 (실제 스테이지 진입 전까지는 is_in_run = false)
-	ProfileManager.init_new_run()
+	# 스테이지 선택 화면으로 이동 (실제 스테이지 버튼 클릭 시 신규 런 시작 확정)
 	get_tree().change_scene_to_file("res://Scene/Stage.tscn")
 
 func _on_continue_pressed() -> void:

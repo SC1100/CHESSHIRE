@@ -494,6 +494,29 @@ func _recalculate_hand_positions():
 		card.target_position = to_global(local_pos)
 		card.target_rotation = global_transform.basis.get_euler() + local_rot
 
+func _process(delta: float):
+	# 카드를 선택하여 드래그 중일 때: 매 프레임(60~144Hz) 렌더링에 동기화되어 버벅임 없이 극상으로 부드럽게 마우스 추적
+	if selected_card and is_instance_valid(selected_card) and main_camera:
+		var mouse_pos = get_viewport().get_mouse_position()
+		var ray_origin = main_camera.project_ray_origin(mouse_pos)
+		var ray_dir = main_camera.project_ray_normal(mouse_pos)
+		
+		var plane_dist = 1.5 # 카메라 앞 1.5m 거리를 드래그 평면으로 설정
+		var plane = Plane(main_camera.global_transform.basis.z, main_camera.global_position + (main_camera.global_transform.basis.z * -plane_dist))
+		
+		var intersect = plane.intersects_ray(ray_origin, ray_dir)
+		if intersect:
+			# 기민하고 찰떡같이 쫓아오도록 보간 속도 35.0 적용 (마우스에 착 감김)
+			selected_card.global_position = selected_card.global_position.lerp(intersect, 35.0 * delta)
+			selected_card.global_rotation = main_camera.global_rotation
+			
+			# 사용 영역(상단 60%) & 코스트 충족 여부 실시간 하이라이트 평가
+			var screen_height = get_viewport().size.y
+			var hand_area_height = screen_height * 0.4
+			var is_in_play_area = mouse_pos.y <= (screen_height - hand_area_height)
+			var can_play = _can_play_card(selected_card)
+			selected_card.set_ready_to_play_highlight(is_in_play_area and can_play)
+
 func _unhandled_input(event: InputEvent):
 	# 단축키 처리: 스페이스바를 누르면 턴 종료
 	if event is InputEventKey and event.pressed and not event.echo:
@@ -510,24 +533,9 @@ func _unhandled_input(event: InputEvent):
 		return
 		
 	if not main_camera: return
-	
+
 	if event is InputEventMouseMotion:
-		if selected_card:
-			# 드래그 처리: 카메라 앞 일정 거리에 가상의 평면(Plane)을 만들고 교차점을 구함
-			var mouse_pos = event.position
-			var ray_origin = main_camera.project_ray_origin(mouse_pos)
-			var ray_dir = main_camera.project_ray_normal(mouse_pos)
-			
-			var plane_dist = 1.5 # 카메라 앞 1.5m 거리를 드래그 평면으로 설정
-			var plane = Plane(main_camera.global_transform.basis.z, main_camera.global_position + (main_camera.global_transform.basis.z * -plane_dist))
-			
-			var intersect = plane.intersects_ray(ray_origin, ray_dir)
-			if intersect:
-				# 부드럽게 마우스를 따라오도록 보간(Lerp) 적용
-				selected_card.global_position = selected_card.global_position.lerp(intersect, 20.0 * get_process_delta_time())
-				# 들고 있을 때는 기울어지지 않고 똑바로 세움 (스케일 파괴 방지)
-				selected_card.global_rotation = main_camera.global_rotation
-		else:
+		if selected_card == null:
 			# 마우스 커서 위치에 있는 손패 3D 카드 실시간 호버 검사
 			_update_hovered_card(event.position)
 				
@@ -540,6 +548,18 @@ func _unhandled_input(event: InputEvent):
 			# 마우스 놓기: 사용 또는 취소 판정
 			if selected_card != null:
 				_try_play_or_return_card(event.position)
+
+# 카드를 지불할 코스트가 충분하여 정상 사용할 수 있는지 검사 헬퍼
+func _can_play_card(card: CardVisual3D) -> bool:
+	if not card or not is_instance_valid(card) or not card.data:
+		return false
+		
+	var data = card.data
+	var cost_to_pay = data.cost
+	if "X_Cost" in data.tags:
+		cost_to_pay = current_cost
+		
+	return current_cost >= cost_to_pay
 
 # 마우스 커서에 있는 손패 카드를 3D 레이캐스트로 탐지하여 호버 효과 적용
 func _update_hovered_card(mouse_pos: Vector2):
@@ -596,6 +616,9 @@ func _raycast_to_pickup_card(mouse_pos: Vector2):
 func _try_play_or_return_card(mouse_pos: Vector2):
 	var screen_height = get_viewport().size.y
 	var hand_area_height = screen_height * 0.4 # 화면 하단 40% 영역을 손패 공간으로 간주
+	
+	if selected_card and is_instance_valid(selected_card):
+		selected_card.set_ready_to_play_highlight(false)
 	
 	if mouse_pos.y > screen_height - hand_area_height:
 		# 손패 영역에서 마우스를 놓음 -> 사용 취소, 제자리 복귀
