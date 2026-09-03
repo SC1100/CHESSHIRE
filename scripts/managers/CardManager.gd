@@ -36,8 +36,8 @@ var hand_radius: float = 12.0 # 호의 반지름
 var hand_spacing: float = 0.08 # 카드 사이의 각도(라디안)
 
 # 턴 및 드로우 시스템 변수
-var base_draw_amount: int = 4 # 기본 드로우 장수
-var turn_draw_amount: int = 4 # 이번 턴에 실제로 뽑을 장수 (디버프/버프 등 고려)
+var base_draw_amount: int = 5 # 기본 드로우 장수
+var turn_draw_amount: int = 5 # 이번 턴에 실제로 뽑을 장수 (디버프/버프 등 고려)
 
 # 가용 코스트 시스템 변수
 var base_max_cost: int = 4 # 기본 코스트 최대치
@@ -46,6 +46,12 @@ var current_cost: int = 4 # 현재 남은 코스트
 
 # UI 참조 변수
 var cost_label: Label
+var active_viewer_canvas: CanvasLayer = null
+
+func _exit_tree() -> void:
+	if is_instance_valid(active_viewer_canvas):
+		active_viewer_canvas.queue_free()
+		active_viewer_canvas = null
 
 func _ready():
 	add_to_group("CardManager")
@@ -417,21 +423,47 @@ func _animate_exhaust_from_hand(card_3d: CardVisual3D, piece_tag: String = ""):
 	if is_instance_valid(card_3d):
 		card_3d.queue_free()
 
-# 드로우 시각 효과 처리 (위치 이동은 lerp가 전담, 여기서는 회전/크기만)
+# 드로우 시각 효과 처리 (우아한 포물선 Bezier Arc + 위치/회전/크기 일원화 Tween)
 func _animate_drawn_card(card_3d: CardVisual3D):
 	card_3d.visible = true
-	card_3d.set_process(true) # 기존 lerp 로직 가동! (자신의 최종 자리로 일직선 비행)
+	card_3d.is_drawing = true # _process lerp 간섭 차단
+	card_3d.set_process(true)
 	
 	# 시작 회전: 뒷면이 보이게 Y축으로 뒤집어둠 (덱에서 바로 나온 느낌)
 	card_3d.global_rotation = global_rotation + Vector3(0, PI, 0)
 	
-	# 시작 크기: 작게 시작해서 커지도록 연출
+	# 시작 크기: 덱에서 작게(0.2배) 시작
 	card_3d.scale = Vector3(0.2, 0.2, 0.2)
 	
-	# Tween 애니메이션 (회전과 크기만 담당)
+	var start_pos = card_3d.global_position
+	var target_pos = card_3d.target_position
+	
+	# 포물선 최고점 (아치형 곡선): 시작점과 목표점의 중간 위치에서 Y축 위쪽(+0.35m)으로 살짝 솟아오름
+	var mid_pos = (start_pos + target_pos) * 0.5 + (global_transform.basis.y.normalized() * 0.35)
+	
+	var duration: float = 0.5
 	var tween = create_tween().set_parallel(true)
-	tween.tween_property(card_3d, "global_rotation", card_3d.target_rotation, 0.6).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
-	tween.tween_property(card_3d, "scale", Vector3.ONE, 0.6).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
+	
+	# 1. 위치 이동: 2차 베지어 곡선(Quadratic Bezier)을 타며 덱에서 솟아올라 손패로 스무스하게 착지
+	tween.tween_method(
+		func(t: float):
+			if is_instance_valid(card_3d):
+				var pos = (1.0 - t) * (1.0 - t) * start_pos + 2.0 * (1.0 - t) * t * mid_pos + t * t * target_pos
+				card_3d.global_position = pos,
+		0.0, 1.0, duration
+	).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
+	
+	# 2. 회전: 비행 도중 자연스럽게 앞면으로 180도 회전
+	tween.tween_property(card_3d, "global_rotation", card_3d.target_rotation, duration).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
+	
+	# 3. 크기: 덱에서 0.2배로 시작해 손패에 안착할 때 1.0배 정크기로 확대 (약간의 통통 튀는 탄성 TRANS_BACK)
+	tween.tween_property(card_3d, "scale", Vector3.ONE, duration).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
+	
+	# 4. 도착 완료 시: 드로우 완료 처리 (이후에는 마우스 호버 등 일반 손패 lerp가 제어)
+	tween.chain().tween_callback(func():
+		if is_instance_valid(card_3d):
+			card_3d.is_drawing = false
+	)
 
 # 프로모션 등 특수 상황 시 카드를 손패로 직접 추가하고 드로우 연출 실행
 func add_card_directly_to_hand(card_id: String) -> void:
@@ -749,16 +781,32 @@ func execute_card_view(pile_cards: Array[String], title: String, sort_by_cost: b
 	if current_state != State.IDLE:
 		return
 		
-	current_state = State.VIEWING # 상태 전환 (뒷배경 조작 완전 차단)
+	current_state = State.VIEWING # 상태 전환 (뒷배경 및 보드 조작 완전 차단)
 	
+	# 뷰어 진입 시 보드판의 기존 기물 선택 및 이동 표시, 호버 아웃라인 클리어
+	var board_input = get_tree().root.find_child("BoardInput", true, false)
+	if board_input:
+		if board_input.has_method("clear_selection"):
+			board_input.clear_selection()
+		if "current_hovered_piece" in board_input and is_instance_valid(board_input.current_hovered_piece):
+			if board_input.has_method("_set_piece_outline"):
+				board_input._set_piece_outline(board_input.current_hovered_piece, false)
+			board_input.current_hovered_piece = null
+	
+	if is_instance_valid(active_viewer_canvas):
+		active_viewer_canvas.queue_free()
+		active_viewer_canvas = null
+		
 	var viewer_canvas = CanvasLayer.new()
-	viewer_canvas.layer = 10 # 3D 씬이나 다른 UI보다 무조건 위에 띄움
-	add_child(viewer_canvas)
+	viewer_canvas.layer = 50 # 메인 배틀 HUD(layer=1)보다 높고 PauseUI(layer=99)보다 아래인 최상단 레이어
+	get_tree().root.add_child(viewer_canvas)
+	active_viewer_canvas = viewer_canvas
 	
-	# 어두운 배경 필터 (블랙 반투명)
+	# 어두운 배경 필터 (블랙 반투명, 뒤쪽 클릭 완전 차단)
 	var bg = ColorRect.new()
 	bg.color = Color(0, 0, 0, 0.85)
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	bg.mouse_filter = Control.MOUSE_FILTER_STOP
 	viewer_canvas.add_child(bg)
 	
 	# 상단 제목 라벨
@@ -773,9 +821,10 @@ func execute_card_view(pile_cards: Array[String], title: String, sort_by_cost: b
 	title_label.position.y = 30
 	viewer_canvas.add_child(title_label)
 	
-	# 스크롤 가능한 영역 생성
+	# 스크롤 가능한 영역 생성 (배경 투과 차단)
 	var scroll = ScrollContainer.new()
 	scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
+	scroll.mouse_filter = Control.MOUSE_FILTER_STOP
 	scroll.offset_left = 60
 	scroll.offset_right = -60
 	scroll.offset_top = 90
@@ -843,22 +892,27 @@ func execute_card_view(pile_cards: Array[String], title: String, sort_by_cost: b
 	# 배경(ColorRect) 클릭 시 닫기
 	bg.gui_input.connect(func(event: InputEvent):
 		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-			viewer_canvas.queue_free()
+			if is_instance_valid(viewer_canvas):
+				viewer_canvas.queue_free()
+			active_viewer_canvas = null
 			current_state = State.IDLE
 	)
 	
-	# 닫기 버튼 명시적 제공
+	# 닫기 버튼 명시적 제공 (타이틀 화면 버튼과 일치하는 중앙 정렬 컴팩트 비율)
 	var close_btn = Button.new()
 	close_btn.text = "닫기"
-	close_btn.add_theme_font_size_override("font_size", 22)
-	close_btn.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-	close_btn.offset_left = 360
-	close_btn.offset_right = -360
-	close_btn.offset_top = -75
-	close_btn.offset_bottom = -20
+	close_btn.custom_minimum_size = Vector2(240, 52)
+	close_btn.add_theme_font_size_override("font_size", 20)
+	close_btn.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	close_btn.offset_left = -120
+	close_btn.offset_right = 120
+	close_btn.offset_top = -80
+	close_btn.offset_bottom = -28
 	_apply_hud_button_style(close_btn, false)
 	close_btn.pressed.connect(func():
-		viewer_canvas.queue_free()
+		if is_instance_valid(viewer_canvas):
+			viewer_canvas.queue_free()
+		active_viewer_canvas = null
 		current_state = State.IDLE
 	)
 	viewer_canvas.add_child(close_btn)
@@ -883,7 +937,7 @@ func _apply_hud_button_style(btn: Button, is_highlight: bool = false) -> void:
 	
 	# Hover State
 	var style_hover = style_normal.duplicate()
-	style_hover.bg_color = Color(0.24, 0.27, 0.38, 0.95)
+	style_hover.bg_color = Color(0.20, 0.23, 0.33, 0.95)
 	style_hover.border_color = Color(1.0, 1.0, 1.0, 1.0)
 	style_hover.shadow_size = 10
 	btn.add_theme_stylebox_override("hover", style_hover)
@@ -894,8 +948,17 @@ func _apply_hud_button_style(btn: Button, is_highlight: bool = false) -> void:
 	style_pressed.border_color = Color(0.75, 0.75, 0.8, 0.8)
 	btn.add_theme_stylebox_override("pressed", style_pressed)
 	
+	# Disabled State
+	var style_disabled = StyleBoxFlat.new()
+	style_disabled.bg_color = Color(0.08, 0.08, 0.1, 0.5)
+	style_disabled.set_corner_radius_all(10)
+	style_disabled.set_border_width_all(1)
+	style_disabled.border_color = Color(0.35, 0.35, 0.4, 0.4)
+	btn.add_theme_stylebox_override("disabled", style_disabled)
+	
 	# Font Outlines & Colors
 	btn.add_theme_color_override("font_color", Color.WHITE)
 	btn.add_theme_color_override("font_hover_color", Color(1.0, 0.92, 0.5))
+	btn.add_theme_color_override("font_disabled_color", Color(0.5, 0.5, 0.5, 0.5))
 	btn.add_theme_color_override("font_outline_color", Color.BLACK)
 	btn.add_theme_constant_override("outline_size", 5)

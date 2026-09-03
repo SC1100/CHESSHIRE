@@ -4,6 +4,7 @@ var bg_rect: ColorRect
 var main_container: VBoxContainer
 var card_options_container: HBoxContainer
 var status_label: Label
+var remove_btn: Button
 var card_claimed: bool = false
 var card_removed: bool = false
 
@@ -76,29 +77,31 @@ func _build_ui():
 	btn_hbox.add_theme_constant_override("separation", 20)
 	main_container.add_child(btn_hbox)
 
-	var remove_btn = Button.new()
+	remove_btn = Button.new()
 	remove_btn.text = "덱에서 카드 1장 삭제"
-	remove_btn.custom_minimum_size = Vector2(260, 50)
+	remove_btn.custom_minimum_size = Vector2(260, 52)
 	remove_btn.add_theme_font_size_override("font_size", 18)
 	remove_btn.pressed.connect(_on_remove_card_pressed)
 	btn_hbox.add_child(remove_btn)
+	_apply_button_style(remove_btn, false)
 
 	if is_final_stage:
 		# 3스테이지 클리어 특수 선택지: 덱을 유지한 채 1스테이지 재도전 (회차 루프)
 		var loop_btn = Button.new()
 		loop_btn.text = "덱 유지하고 1스테이지 재도전"
-		loop_btn.custom_minimum_size = Vector2(280, 50)
+		loop_btn.custom_minimum_size = Vector2(280, 52)
 		loop_btn.add_theme_font_size_override("font_size", 18)
-		loop_btn.add_theme_color_override("font_color", Color(0.4, 0.9, 1.0))
 		loop_btn.pressed.connect(_on_restart_with_current_deck_pressed)
 		btn_hbox.add_child(loop_btn)
+		_apply_button_style(loop_btn, false, Color(0.35, 0.8, 1.0, 0.95)) # 시안 틴트
 
 	var next_btn = Button.new()
 	next_btn.text = "런 완료 (메인으로)" if is_final_stage else "다음 스테이지로 ➔"
-	next_btn.custom_minimum_size = Vector2(200, 50)
+	next_btn.custom_minimum_size = Vector2(240, 52)
 	next_btn.add_theme_font_size_override("font_size", 18 if is_final_stage else 20)
 	next_btn.pressed.connect(_on_next_stage_pressed)
 	btn_hbox.add_child(next_btn)
+	_apply_button_style(next_btn, true) # 골드 악센트 테두리
 
 func _generate_card_rewards():
 	var piece_pool: Array[String] = []
@@ -233,7 +236,7 @@ func _claim_card(card_id: String, card_name: String, selected_btn: Button):
 			btn.modulate = Color(0.4, 0.4, 0.4, 0.45)
 
 func _on_remove_card_pressed():
-	if card_removed:
+	if card_removed or (remove_btn and remove_btn.disabled):
 		status_label.text = "이번 보상에서는 이미 카드 1장을 삭제했습니다."
 		return
 
@@ -299,10 +302,11 @@ func _on_remove_card_pressed():
 
 	var cancel_btn = Button.new()
 	cancel_btn.text = "닫기"
-	cancel_btn.custom_minimum_size = Vector2(180, 50)
+	cancel_btn.custom_minimum_size = Vector2(220, 52)
 	cancel_btn.add_theme_font_size_override("font_size", 20)
 	cancel_btn.pressed.connect(func(): pop_canvas.queue_free())
 	pop_vbox.add_child(cancel_btn)
+	_apply_button_style(cancel_btn, false)
 
 func _create_removal_card_panel(card_id: String, pm: Node, pop_canvas: CanvasLayer) -> Control:
 	var data = CardData.database.get(card_id, null)
@@ -336,6 +340,9 @@ func _create_removal_card_panel(card_id: String, pm: Node, pop_canvas: CanvasLay
 		if pm and pm.has_method("remove_card_from_master_deck"):
 			pm.remove_card_from_master_deck(card_id)
 		card_removed = true
+		if is_instance_valid(remove_btn):
+			remove_btn.disabled = true
+			remove_btn.text = "카드 1장 삭제 완료"
 		status_label.text = "[ %s ] 카드를 덱에서 삭제했습니다." % card_name
 		pop_canvas.queue_free()
 	)
@@ -383,3 +390,52 @@ func _on_next_stage_pressed():
 		
 	print("RewardUI: 다음 스테이지 '%s'로 직행합니다." % next_id)
 	get_tree().change_scene_to_file("res://Scene/Battle_Scene.tscn")
+
+func _apply_button_style(btn: Button, is_accent: bool = false, custom_border: Color = Color.TRANSPARENT) -> void:
+	if not btn: return
+	
+	# Normal State
+	var style_normal = StyleBoxFlat.new()
+	if is_accent:
+		style_normal.bg_color = Color(0.18, 0.14, 0.08, 0.92) # 골드 악센트 다크 배경
+		style_normal.border_color = Color(1.0, 0.85, 0.4, 0.95) # 골드 테두리
+	elif custom_border != Color.TRANSPARENT:
+		style_normal.bg_color = Color(0.08, 0.14, 0.18, 0.92)
+		style_normal.border_color = custom_border
+	else:
+		style_normal.bg_color = Color(0.10, 0.12, 0.18, 0.88)
+		style_normal.border_color = Color(0.92, 0.92, 0.96, 0.9)
+		
+	style_normal.set_corner_radius_all(10)
+	style_normal.set_border_width_all(2)
+	style_normal.shadow_color = Color(0.0, 0.0, 0.0, 0.5)
+	style_normal.shadow_size = 6
+	btn.add_theme_stylebox_override("normal", style_normal)
+	
+	# Hover State
+	var style_hover = style_normal.duplicate()
+	style_hover.bg_color = Color(0.20, 0.23, 0.33, 0.95)
+	style_hover.border_color = Color(1.0, 1.0, 1.0, 1.0)
+	style_hover.shadow_size = 10
+	btn.add_theme_stylebox_override("hover", style_hover)
+	
+	# Pressed State
+	var style_pressed = style_normal.duplicate()
+	style_pressed.bg_color = Color(0.06, 0.08, 0.14, 0.95)
+	style_pressed.border_color = Color(0.75, 0.75, 0.8, 0.8)
+	btn.add_theme_stylebox_override("pressed", style_pressed)
+	
+	# Disabled State
+	var style_disabled = StyleBoxFlat.new()
+	style_disabled.bg_color = Color(0.08, 0.08, 0.1, 0.5)
+	style_disabled.set_corner_radius_all(10)
+	style_disabled.set_border_width_all(1)
+	style_disabled.border_color = Color(0.35, 0.35, 0.4, 0.4)
+	btn.add_theme_stylebox_override("disabled", style_disabled)
+	
+	# Font Colors & Outlines
+	btn.add_theme_color_override("font_color", Color.WHITE)
+	btn.add_theme_color_override("font_hover_color", Color(1.0, 0.92, 0.5))
+	btn.add_theme_color_override("font_disabled_color", Color(0.5, 0.5, 0.5, 0.5))
+	btn.add_theme_color_override("font_outline_color", Color.BLACK)
+	btn.add_theme_constant_override("outline_size", 5)

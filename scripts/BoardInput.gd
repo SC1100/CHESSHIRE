@@ -33,6 +33,18 @@ func _physics_process(_delta: float) -> void:
 	if not camera or not info_label:
 		return
 
+	# CardManager FSM 상태 확인: 뷰어(VIEWING)나 드로우 중에는 보드판 호버 하이라이트 제거 및 차단
+	var card_manager = get_tree().get_first_node_in_group("CardManager")
+	if card_manager and "current_state" in card_manager:
+		if card_manager.current_state != CardManager.State.IDLE:
+			if current_hovered_piece and is_instance_valid(current_hovered_piece):
+				if current_hovered_piece != selected_piece:
+					_set_piece_outline(current_hovered_piece, false)
+				current_hovered_piece = null
+			current_hovered_tile = ""
+			info_label.text = "현재 위치 : None"
+			return
+
 	# 1. 2D 화면 픽셀 좌표 가져오기
 	var mouse_pos = get_viewport().get_mouse_position()
 	
@@ -101,6 +113,12 @@ func _physics_process(_delta: float) -> void:
 		current_hovered_piece = new_hovered_piece
 
 func _unhandled_input(event: InputEvent) -> void:
+	# CardManager FSM 상태 확인: 뷰어(VIEWING) 상태이거나 IDLE이 아닐 때는 보드 클릭 및 이동 차단
+	var card_manager = get_tree().get_first_node_in_group("CardManager")
+	if card_manager and "current_state" in card_manager:
+		if card_manager.current_state != CardManager.State.IDLE:
+			return
+
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
 		var board_manager = get_node_or_null("../BoardManager")
 		if not board_manager: return
