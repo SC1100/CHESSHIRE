@@ -2,8 +2,6 @@
 > 카드 기반 로그라이크 덱빌딩 체스 게임
 
 <img width="800" height="450" alt="image" src="https://github.com/user-attachments/assets/fd9a5e5c-ea67-405d-8e27-ef49127b7cf9" />
-<img width="800" height="450" alt="image" src="https://github.com/user-attachments/assets/0c0f70df-b706-4b4d-80d1-7b5e04a61222" />
-<img width="800" height="450" alt="image" src="https://github.com/user-attachments/assets/6d166d19-4e6d-439f-ac7a-a9f3bb7b692e" />
 
 ## 목차
 
@@ -21,9 +19,19 @@
 ## 게임 시스템
 
 ### 1. 카드 기반 덱빌딩 체스 시스템
+
 - **행동권 부여 시스템** : 카드를 소모하여 특정 기물에 행동권(Action Token)을 부여하는 독창적인 체스 룰 구현
 - **전술 카드 시스템** : 드로우, 코스트, 특수 행동 및 효과 등을 가진 전술 카드로 다양한 컨셉 및 전략적 플레이
-- **덱빌딩 시스템** : 매 전투 승리 시 카드를 획득하고 덱의 카드 제거 가능, 플레이어가 원하는 덱을 통한 다양한 전략의 체스 플레이
+
+
+<img width="800" height="450" alt="image" src="https://github.com/user-attachments/assets/0c0f70df-b706-4b4d-80d1-7b5e04a61222" />
+
+
+- **덱빌딩 시스템** : 매 전투 승리 시 카드를 획득하고 덱의 카드 제거 가능, 플레이어가 원하는 덱을 만들어 다양한 전략의 체스 플레이
+
+
+<img width="800" height="450" alt="image" src="https://github.com/user-attachments/assets/6d166d19-4e6d-439f-ac7a-a9f3bb7b692e" />
+
  
 ### 2. 자체 설계 휴리스틱 체스 AI 
 - **가중치 기반 점수 평가**: 기물 가치, 위치 이점, 위협 가산점, 위험 감점 등 알고리즘을 바탕으로 그리드 별 점수 평가를 통해 행동 결정 
