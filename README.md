@@ -1,5 +1,6 @@
 # Chesshire
 > 카드 기반 로그라이크 덱빌딩 체스 게임
+<img width="1599" height="900" alt="image" src="https://github.com/user-attachments/assets/c4d9944e-fd05-4311-a3d3-b8246291c7cb" />
 
 ## 목차
 
