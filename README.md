@@ -24,7 +24,6 @@
 - **전술 카드 시스템** : 드로우, 코스트, 특수 행동 및 효과 등을 가진 전술 카드로 다양한 컨셉 및 전략적 플레이
 
 <img width="640" height="360" alt="2026-09-09 22-37-26_20sec" src="https://github.com/user-attachments/assets/1c82d967-dc45-4d2a-ba1f-15d74cf43e38" />
-<img width="800" height="450" alt="image" src="https://github.com/user-attachments/assets/0c0f70df-b706-4b4d-80d1-7b5e04a61222" />
 
 
 - **덱빌딩 시스템** : 매 전투 승리 시 카드를 획득하고 덱의 카드 제거 가능, 플레이어가 원하는 덱을 만들어 다양한 전략의 체스 플레이
